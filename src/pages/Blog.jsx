@@ -12,8 +12,8 @@ import {
 } from "firebase/firestore";
 import { useAuth } from "../Context/AuthContext";
 import { Nav } from "../Home/Nav";
-import { SearchBar } from "../_component_/SearchBar";
 import { Link } from "react-router-dom";
+import { MessageCircle, Heart, Share2, MoreHorizontal, Send, Image as ImageIcon } from "lucide-react";
 
 export const Blog = () => {
   const { user } = useAuth();
@@ -22,11 +22,8 @@ export const Blog = () => {
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
-  const [activeChat, setActiveChat] = useState(null);
-  const [chatMessages, setChatMessages] = useState({});
-  const [newMessage, setNewMessage] = useState("");
+  const [activeChat, setActiveChat] = useState(null); // For comments text input focus
 
   const fetchPosts = async () => {
     setLoading(true);
@@ -40,7 +37,7 @@ export const Blog = () => {
     setLoading(false);
   };
 
-  // Fetch real-time online user status from Firestore
+  // Real-time online user status
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "status"), (snapshot) => {
       const updatedStatus = {};
@@ -49,294 +46,165 @@ export const Blog = () => {
       });
       setOnlineUsers(updatedStatus);
     });
-
-    return () => unsubscribe(); // Clean up listener on unmount
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     fetchPosts();
   }, []);
 
-  // Real-time chat listener for active post
-  useEffect(() => {
-    if (!activeChat) return;
-
-    const messagesRef = collection(db, "posts", activeChat, "comments");
-    const q = query(messagesRef, orderBy("timestamp", "asc"));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const messages = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setChatMessages((prev) => ({ ...prev, [activeChat]: messages }));
-    });
-
-    return () => unsubscribe();
-  }, [activeChat]);
-
-  const sendComment = async (postId) => {
-    if (!newMessage.trim() || !user) return;
-
-    try {
-      await addDoc(collection(db, "posts", postId, "comments"), {
-        text: newMessage,
-        userId: user.uid,
-        userEmail: user.email,
-        timestamp: serverTimestamp(),
-      });
-      setNewMessage("");
-    } catch (err) {
-      console.error("Error sending comment:", err);
-    }
-  };
-
-  // const toggleChat = (postId) => {
-  //   setActiveChat(activeChat === postId ? null : postId);
-  // };
-
   const handlePostSubmit = async (e) => {
     e.preventDefault();
-    if (!title || !content) {
-      toast.error("All fields are required");
+    if (!content) {
+      toast.error("Post content is required");
       return;
     }
 
     try {
       await addDoc(collection(db, "posts"), {
-        title,
+        title: title || "Untitled", // Titles are optional in social feeds
         content,
         authorId: user.uid,
         authorEmail: user.email,
+        authorName: user.displayName || user.email.split('@')[0],
         createdAt: serverTimestamp(),
+        likes: 0,
+        comments: 0
       });
       setTitle("");
       setContent("");
       setShowForm(false);
-      toast.success("Post added successfully");
+      toast.success("Posted!");
       fetchPosts();
     } catch (err) {
       console.error("Error adding post:", err);
-      toast.error("Failed to add post");
+      toast.error("Failed to post");
     }
   };
 
-  const filteredPosts =
-    searchQuery.trim() === ""
-      ? posts
-      : posts.filter(
-          (post) =>
-            post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            post.content.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-
   return (
-    <>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20 transition-colors duration-300">
       <Nav />
-      <div className="w-full min-h-screen">
-        <div className="bg-gradient-to-br from-green-100 via-white mt-4 to-green-50 w-full text-center flex items-center justify-center py-30 pb-40">
-          <div className="text-center w-7xl flex items-center justify-center flex-col mb-10">
-            <h1 className="font-bold text-gray-800 mb-2">
-              <span className="text-5xl font-bold text-gray-800">Marketing</span>
-              <span className="text-5xl font-bold text-green-600"> Insights</span>
-            </h1>
-            <p className="text-gray-800 max-w-[50rem] text-[20px]">
-              Expert insights, proven strategies, and actionable tips to
-              transform your marketing thoughts into profitable realities.
-            </p>
-            <div className="pt-8 w-full">
-              <SearchBar
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
 
-        <div className="max-w-7xl mx-auto p-2 sm:p-4 mt-10 sm:mt-20 relative">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {loading
-              ? Array.from({ length: 6 }).map((_, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-white border-gray-200 shadow-sm border rounded-xl p-4 sm:p-5 animate-pulse min-h-[220px] flex flex-col justify-between"
-                  >
-                    <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-                      <span className="bg-green-100 h-5 w-16 rounded-full"></span>
-                      <span className="bg-gray-200 h-4 w-12 rounded"></span>
-                    </div>
-                    <div className="h-6 bg-gray-200 rounded mb-2 w-3/4"></div>
-                    <div className="h-4 bg-gray-100 rounded mb-4 w-full"></div>
-                    <div className="h-4 bg-gray-100 rounded mb-3 w-1/2"></div>
-                    <div className="h-8 bg-green-200 rounded-full w-32"></div>
-                  </div>
-                ))
-              : filteredPosts.map((post) => (
-                  <div
-                    key={post.id}
-                    className="bg-white hover:border-green-200 border-gray-200 shadow-sm border rounded-xl p-4 sm:p-5 transition-transform duration-300 ease-in-out hover:shadow-lg hover:scale-[1.02] flex flex-col justify-between min-h-[220px]"
-                  >
-                    <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
-                      <span className="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">
-                        {post.category || "General"}
-                      </span>
-                      <span className="text-gray-400 text-xs">8 min read</span>
-                    </div>
+      <div className="max-w-xl mx-auto pt-20 px-0 sm:px-4">
 
-                    <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-2 break-words">
-                      {post.title}
-                    </h2>
-
-                    <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-4 break-words">
-                      {post.content.slice(0, 100)}...
-                    </p>
-
-                    <div className="text-xs text-gray-500 mb-2 sm:mb-3 flex items-center flex-wrap gap-2">
-                      <span className="flex items-center gap-1">
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            onlineUsers[post.authorId]
-                              ? "bg-green-500"
-                              : "bg-red-500"
-                          }`}
-                          title={
-                            onlineUsers[post.authorId] ? "Online" : "Offline"
-                          }
-                        ></span>
-                        By {post.authorEmail}
-                      </span>
-                      •
-                      <span>
-                        {post.createdAt?.toDate().toLocaleDateString()}
-                      </span>
-                    </div>
-
-                    <div className="flex gap-2 mt-2">
-                      {post.authorId !== user?.uid && (
-                        <Link
-                          to={`/chat/${post.authorId}`}
-                          className="inline-block text-sm hover:underline text-green-600"
-                        >
-                          Message Author 💬
-                        </Link>
-                      )}
-                      {/* <button
-                        onClick={() => toggleChat(post.id)}
-                        className="text-sm text-blue-600 hover:underline ml-auto"
-                      >
-                        {activeChat === post.id ? "Hide Chat 🔽" : "Show Chat 💬"}
-                      </button> */}
-                    </div>
-
-                    {/* Real-time Chat Section */}
-                    {activeChat === post.id && (
-                      <div className="mt-4 border-t pt-3">
-                        <h3 className="text-sm font-semibold mb-2 text-gray-700">
-                          Live Discussion
-                        </h3>
-                        <div className="bg-gray-50 rounded p-2 mb-2 max-h-[200px] overflow-y-auto">
-                          {chatMessages[post.id]?.length > 0 ? (
-                            chatMessages[post.id].map((msg) => (
-                              <div
-                                key={msg.id}
-                                className={`mb-2 p-2 rounded text-xs ${
-                                  msg.userId === user?.uid
-                                    ? "bg-green-100 ml-4"
-                                    : "bg-white mr-4"
-                                }`}
-                              >
-                                <div className="font-semibold text-gray-700">
-                                  {msg.userEmail}
-                                </div>
-                                <div className="text-gray-600">{msg.text}</div>
-                              </div>
-                            ))
-                          ) : (
-                            <p className="text-xs text-gray-400 text-center py-2">
-                              No messages yet. Start the conversation!
-                            </p>
-                          )}
-                        </div>
-                        {user ? (
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={newMessage}
-                              onChange={(e) => setNewMessage(e.target.value)}
-                              onKeyPress={(e) =>
-                                e.key === "Enter" && sendComment(post.id)
-                              }
-                              placeholder="Type a message..."
-                              className="flex-1 text-xs p-2 border rounded focus:outline-none focus:border-green-500"
-                            />
-                            <button
-                              onClick={() => sendComment(post.id)}
-                              className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700"
-                            >
-                              Send
-                            </button>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-gray-500 text-center">
-                            Please log in to join the discussion
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-          </div>
-
-          {user && (
-            <button
-              className="fixed bottom-6 right-6 bg-green-600 text-white rounded-full w-14 h-14 shadow-lg hover:bg-green-700 text-2xl"
-              onClick={() => setShowForm(true)}
-            >
-              +
-            </button>
-          )}
-
-          {showForm && (
-            <div className="fixed inset-0 backdrop-blur-sm bg-[#00000040] flex justify-center items-center z-50">
-              <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md relative">
-                <h2 className="text-center text-3xl font-bold mb-4">
-                  Create New Post
-                </h2>
-                <form onSubmit={handlePostSubmit}>
-                  <input
-                    type="text"
-                    placeholder="Post Title"
-                    className="w-full mb-3 p-2 border focus:outline-none focus:shadow-sm focus:shadow-green-600 rounded"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                  />
-                  <textarea
-                    placeholder="Post Content..."
-                    className="w-full mb-4 p-2 border focus:outline-none focus:shadow-sm focus:shadow-green-600 rounded min-h-[120px]"
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                  />
-                  <div className="flex justify-between">
-                    <button
-                      type="submit"
-                      className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                    >
-                      Publish
-                    </button>
-                    <button
-                      type="button"
-                      className="text-gray-500 hover:bg-gray-800 rounded hover:text-white px-3"
-                      onClick={() => setShowForm(false)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
+        {/* Create Post Input (Twitter/FB style) */}
+        {user && (
+          <div className="bg-white dark:bg-gray-800 p-4 sm:rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 transition-colors">
+            <div className="flex gap-4">
+              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400 font-bold shrink-0">
+                {user.email.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1">
+                <textarea
+                  placeholder="What's happening?"
+                  className="w-full resize-none border-none focus:ring-0 text-lg dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 min-h-[80px] bg-transparent"
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                />
+                <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-50 dark:border-gray-700">
+                  <button className="text-green-600 dark:text-green-400 p-2 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-full transition">
+                    <ImageIcon size={20} />
+                  </button>
+                  <button
+                    onClick={handlePostSubmit}
+                    disabled={!content.trim()}
+                    className="bg-green-600 text-white px-6 py-2 rounded-full font-bold text-sm hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    Post
+                  </button>
+                </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Feed */}
+        <div className="space-y-4 sm:space-y-6">
+          {loading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm h-64 animate-pulse">
+                <div className="flex gap-3 mb-4">
+                  <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                  <div className="space-y-2">
+                    <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="h-3 w-20 bg-gray-100 dark:bg-gray-700 rounded"></div>
+                  </div>
+                </div>
+                <div className="h-32 bg-gray-100 dark:bg-gray-700 rounded-xl"></div>
+              </div>
+            ))
+          ) : (
+            posts.map((post) => (
+              <article key={post.id} className="bg-white dark:bg-gray-800 sm:rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors">
+                {/* Post Header */}
+                <div className="p-4 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <div className="w-10 h-10 bg-gradient-to-tr from-yellow-400 to-purple-600 p-[2px] rounded-full">
+                        <div className="w-full h-full bg-white dark:bg-gray-800 rounded-full flex items-center justify-center font-bold text-gray-700 dark:text-gray-200 text-sm overflow-hidden">
+                          {post.authorEmail.charAt(0).toUpperCase()}
+                        </div>
+                      </div>
+                      {onlineUsers[post.authorId] && (
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm text-gray-900 dark:text-white leading-tight">{post.authorName || post.authorEmail.split('@')[0]}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {post.createdAt?.toDate().toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <button className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
+                    <MoreHorizontal size={20} />
+                  </button>
+                </div>
+
+                {/* Post Content */}
+                <div className="px-4 pb-2">
+                  {post.title && post.title !== "Untitled" && <h3 className="font-bold mb-2 text-gray-900 dark:text-white">{post.title}</h3>}
+                  <p className="text-gray-800 dark:text-gray-200 text-[15px] whitespace-pre-wrap leading-relaxed">
+                    {post.content}
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="px-4 py-3 flex items-center justify-between border-t border-gray-50 dark:border-gray-700 mt-2 transition-colors">
+                  <div className="flex items-center gap-6">
+                    <button className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition group">
+                      <Heart size={22} className="group-hover:scale-110 transition-transform" />
+                    </button>
+                    <button className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition">
+                      <MessageCircle size={22} />
+                    </button>
+                    <button className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-green-500 dark:hover:text-green-500 transition">
+                      <Share2 size={22} />
+                    </button>
+                  </div>
+
+                  {/* Message Author Button */}
+                  {post.authorId !== user?.uid && (
+                    <Link
+                      to={`/chat/${post.authorId}`}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-green-50 dark:hover:bg-green-900/40 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 rounded-full text-xs font-bold transition"
+                    >
+                      <Send size={14} />
+                      Message
+                    </Link>
+                  )}
+                </div>
+
+                {/* Likes count (Mock) */}
+                <div className="px-4 pb-4">
+                  <p className="text-sm font-bold text-gray-900 dark:text-gray-100">24 likes</p>
+                </div>
+              </article>
+            ))
           )}
         </div>
+
       </div>
-    </>
+    </div>
   );
 };

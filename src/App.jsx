@@ -9,11 +9,15 @@ import { Blog } from "./pages/Blog";
 import { Contact } from "./pages/Contact";
 import { Marketing } from "./Home/Marketing";
 import { About } from "./Home/About";
-import { Chat }  from "./_component_/Chat";
+import { Chat } from "./_component_/Chat";
 import { ChatList } from "./pages/ChatList";
+import { Profile } from "./pages/Profile";
+import { CreatePost } from "./pages/CreatePost";
+import { ThemeProvider } from "./Context/ThemeContext";
 
 const App = () => {
   return (
+    <ThemeProvider>
     <Router>
       <Toaster
         position="bottom-center"
@@ -49,8 +53,11 @@ const App = () => {
         <Route path="/contact" element={<Contact />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/create-post" element={<CreatePost />} />
       </Routes>
     </Router>
+    </ThemeProvider>
   );
 };
 
