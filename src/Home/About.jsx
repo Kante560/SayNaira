@@ -14,7 +14,7 @@ export const About = () => {
         <div className="text-center max-w-[50rem] flex justify-center items-center flex-col mt-10 mb-6">
           <h1 className=" font-bold text-gray-800 mb-6 ">
             <span className="text-4xl font-bold text-gray-800 ">About</span>
-            <span className="text-4xl font-bold text-green-600"> SayNaira</span>
+            <span className="text-4xl font-bold text-green-600"> SayLess</span>
           </h1>
           <p className="text-gray-800 text-[20px] p-2 ">
             {" "}
@@ -34,7 +34,7 @@ export const About = () => {
             <div>
               <p className="text-gray-800 mb-7 text-[19px]">
                 Founded with the vision of making every marketing naira count,
-                SayNaira emerged from the understanding that great marketing
+                SayLess emerged from the understanding that great marketing
                 thoughts need expert execution to become reality.
               </p>
               <p className="text-gray-800 mb-7 text-[19px]">

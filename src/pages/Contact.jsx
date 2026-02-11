@@ -27,8 +27,8 @@ export const Contact = () => {
                 <Mail className="text-green-600 mt-1" />
                 <div className="items-start">
                   <h3 className="text-lg font-semibold mb-1">Email Us</h3>
-                  <p>hello@saynaira.com</p>
-                  <p>support@saynaira.com</p>
+                  <p>hello@SayLess.com</p>
+                  <p>support@SayLess.com</p>
                 </div>
               </div>
 

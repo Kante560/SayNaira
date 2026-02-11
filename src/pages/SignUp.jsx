@@ -17,7 +17,7 @@ const SignUp = () => {
     try {
       setLoading(true);
       await signup(email, password, name);
-      toast.success("Signup successful! Welcome to SayNaira.");
+      toast.success("Signup successful! Welcome to SayLess.");
       navigate("/");
     } catch (err) {
       console.error("Signup failed:", err.message);
@@ -34,7 +34,17 @@ const SignUp = () => {
       <form
         onSubmit={handleSignUp}
         className="p-8 border border-gray-200 rounded-lg min-w-[400px] bg-white shadow-md"
-      >
+      > <Link to="/">
+                <h2 className="text-center items-center flex justify-center mb-4" >
+                   < div className="flex items-center cursor:pointer space-x-2 px-4">
+                  <div className="flex item-center space-x-2 text-[13.5px] font-bold p-1.5 px-2.5 rounded-lg bg-green-600 text-white">
+                    ₦
+                  </div>
+                  <span>
+                    <h1 className="font-bold text-2xl text-green-600">SayLess</h1>
+                  </span>
+                </div></h2>
+                </Link>
         <h2 className="text-2xl font-semibold text-center mb-6">Sign Up</h2>
         <div className="mb-4">
           <label

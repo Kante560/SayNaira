@@ -57,7 +57,7 @@ try {
               ₦
             </div>
             <span>
-              <h1 className="font-bold text-2xl text-green-600">SayNaira</h1>
+              <h1 className="font-bold text-2xl text-green-600">SayLess</h1>
             </span>
           </div></h2>
           </Link>
