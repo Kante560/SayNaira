@@ -167,7 +167,7 @@ export const Chat = () => {
       <Nav />
 
       {/* Chat Container - Full height minus Nav */}
-      <div className="flex-1 flex flex-col pt-16 md:pt-16 max-w-4xl mx-auto w-full overflow-hidden">
+      <div className="flex-1 flex flex-col pt-0 md:pt-16 max-w-4xl mx-auto w-full overflow-hidden">
 
         {/* Chat Header - Sticky at top */}
         <div className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 border-b dark:border-gray-700 z-10 transition-colors">
@@ -180,7 +180,7 @@ export const Chat = () => {
               <div className="w-10 h-10 bg-gradient-to-tr from-green-400 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold">
                 {recipientInfo?.email?.charAt(0).toUpperCase() || "?"}
               </div>
-              {isOnline && <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>}
+              <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 border-2 border-white dark:border-gray-800 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`}></div>
             </div>
             <div>
               <h3 className="font-bold text-gray-900 dark:text-white leading-tight">
@@ -236,7 +236,7 @@ export const Chat = () => {
         </div>
 
         {/* Input Area - Fixed at bottom */}
-        <div className="p-3 bg-white dark:bg-gray-800 border-t dark:border-gray-700 transition-colors mb-16 md:mb-0 relative">
+        <div className="p-3 bg-white dark:bg-gray-800 border-t dark:border-gray-700 transition-colors mb-0 relative">
           <form onSubmit={sendMessage} className="flex gap-2 items-center bg-gray-100 dark:bg-gray-700 rounded-full px-4 py-2 transition-colors">
             {/* Sticker button */}
             <button

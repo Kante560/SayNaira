@@ -145,9 +145,7 @@ export const Blog = () => {
                           {post.authorEmail.charAt(0).toUpperCase()}
                         </div>
                       </div>
-                      {onlineUsers[post.authorId] && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
-                      )}
+                      <div className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white dark:border-gray-800 rounded-full ${onlineUsers[post.authorId] ? "bg-green-500" : "bg-red-500"}`}></div>
                     </div>
                     <div>
                       <p className="font-bold text-sm text-gray-900 dark:text-white leading-tight">{post.authorName || post.authorEmail.split('@')[0]}</p>

@@ -25,7 +25,7 @@ export const Footer = () => {
             </span>
           </div>
           <p className="text-gray-400 dark:text-gray-500 mb-6">
-            Transforming marketing thoughts into profitable realities. We help businesses grow by making every naira count in their marketing investments.
+            Connecting Africa and the world through fast, secure, and effortless messaging. SayLess lets you focus on what matters most — the conversation.
           </p>
           {/* Social Icons */}
           <div className="flex gap-4 text-gray-200">

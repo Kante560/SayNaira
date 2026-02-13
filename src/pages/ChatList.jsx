@@ -158,7 +158,6 @@ export const ChatList = () => {
             {Object.entries(users).map(([uid, u]) => {
               if (uid === user?.uid) return null;
               const isOnline = onlineUsers[uid];
-              if (!isOnline) return null;
 
               return (
                 <div
@@ -166,11 +165,11 @@ export const ChatList = () => {
                   onClick={() => navigate(`/chat/${uid}`)}
                   className="flex flex-col items-center space-y-1 cursor-pointer"
                 >
-                  <div className="relative p-[2px] rounded-full bg-gradient-to-tr from-green-400 to-emerald-600">
+                  <div className={`relative p-[2px] rounded-full ${isOnline ? "bg-gradient-to-tr from-green-400 to-emerald-600" : "bg-gray-300 dark:bg-gray-700"}`}>
                     <div className="w-16 h-16 rounded-full bg-white dark:bg-gray-800 border-2 border-white dark:border-gray-800 flex items-center justify-center overflow-hidden transition-colors">
                       <span className="text-xl font-bold text-gray-700 dark:text-gray-200">{(u.name || u.email || "?").charAt(0).toUpperCase()}</span>
                     </div>
-                    {isOnline && <div className="absolute bottom-1 right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>}
+                    <div className={`absolute bottom-1 right-1 w-3.5 h-3.5 border-2 border-white dark:border-gray-800 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`}></div>
                   </div>
                   <span className="text-xs font-medium text-gray-700 dark:text-gray-300 max-w-[64px] truncate">{u.name || "User"}</span>
                 </div>
@@ -193,6 +192,7 @@ export const ChatList = () => {
                   <div className="w-14 h-14 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 font-bold text-xl transition-colors">
                     {(conv.otherUserName).charAt(0).toUpperCase()}
                   </div>
+                  <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-white dark:border-gray-800 rounded-full ${onlineUsers[conv.otherUserId] ? "bg-green-500" : "bg-red-500"}`}></div>
                 </div>
 
                 {/* Content */}

@@ -8,7 +8,7 @@ import { Nav } from "./Nav";
 export const About = () => {
   return (
     <div className="bg-white dark:bg-gray-900 transition-colors duration-300">
-    <Nav />
+      <Nav />
       <div className="flex justify-center items-center  w-full  mt-8 bg-white dark:bg-gray-900 transition-colors">
         <div className="text-center max-w-[50rem] flex justify-center items-center flex-col mt-10 mb-6">
           <h1 className=" font-bold text-gray-800 dark:text-gray-100 mb-6 ">
@@ -17,9 +17,7 @@ export const About = () => {
           </h1>
           <p className="text-gray-800 dark:text-gray-300 text-[20px] p-2 ">
             {" "}
-            We're passionate about transforming marketing thoughts into
-            profitable realities. Every naira you invest with us is
-            strategically deployed for maximum impact.
+            We're building the future of African connectivity. SayLess is more than just a chat app; it's a bridge that brings people together across any distance.
           </p>
         </div>
       </div>
@@ -32,20 +30,13 @@ export const About = () => {
             </h1>
             <div>
               <p className="text-gray-800 dark:text-gray-300 mb-7 text-[19px]">
-                Founded with the vision of making every marketing naira count,
-                SayLess emerged from the understanding that great marketing
-                thoughts need expert execution to become reality.
+                SayLess was born from a simple observation: modern communication is often too complex and heavy. We wanted to create a tool that is lightning-fast, secure, and works on any browser without any installs.
               </p>
               <p className="text-gray-800 dark:text-gray-300 mb-7 text-[19px]">
-                Our team combines deep marketing expertise with innovative
-                thinking to help businesses of all sizes achieve their growth
-                objectives. We believe that with the right strategy, every
-                business can thrive in today's competitive landscape.
+                Our team combines world-class engineering with a deep understanding of local needs to build a platform that thrives even on low bandwidth, ensuring no one is left out of the digital conversation.
               </p>
               <p className="text-gray-800 dark:text-gray-300 mb-7 text-[19px]">
-                From startups to established enterprises, we've helped countless
-                organizations transform their marketing approach and achieve
-                remarkable results that speak for themselves.
+                What started as a simple idea has grown into a community of users who value privacy, speed, and simplicity. We're proud to be built in Nigeria, for the world.
               </p>
 
               <Link to="/signup">
@@ -131,11 +122,10 @@ export const About = () => {
               className=" flex h-[200px] w-[270px] flex-col hover:shadow-2xl rounded-lg py-4 px-8 bg-white dark:bg-gray-800 transition
                 duration-300 ease-in-out text-center shadow-md items-center"
             >
-              <p className="text-2xl font-bold text-black dark:text-white my-4">Innovation</p>
+              <p className="text-2xl font-bold text-black dark:text-white my-4">Speed</p>
 
               <p className="text-gray-800 dark:text-gray-300 p-3 text-[16px] flex-wrap-wrap ">
-                We stay ahead of marketing trends and technologies to deliver
-                cutting-edge solutions.
+                Our app is optimized for lightning-fast message delivery, even on 2G networks.
               </p>
             </div>
 
@@ -144,12 +134,11 @@ export const About = () => {
                 duration-300 ease-in-out text-center shadow-md items-center"
             >
               <p className="text-2xl font-bold text-black dark:text-white my-4">
-                Results-Driven
+                Security
               </p>
 
               <p className="text-gray-800 dark:text-gray-300 p-3 text-[16px] flex-wrap-wrap ">
-                Every strategy is designed with measurable outcomes and ROI in
-                mind.
+                We use industry-standard encryption to ensure your private conversations stay private.
               </p>
             </div>
 
@@ -158,12 +147,11 @@ export const About = () => {
                 duration-300 ease-in-out text-center shadow-md items-center"
             >
               <p className="text-2xl font-bold text-black dark:text-white my-4">
-                Client-Focused
+                Inclusivity
               </p>
 
               <p className="text-gray-800 dark:text-gray-300 p-3 text-[16px] flex-wrap-wrap ">
-                Your success is our priority. We build long-term partnerships,
-                not just projects.
+                Zero downloads means anyone with a browser can connect, regardless of device storage.
               </p>
             </div>
 
@@ -171,11 +159,10 @@ export const About = () => {
               className=" flex h-[200px] w-[270px] flex-col hover:shadow-2xl rounded-lg py-4 px-8 bg-white dark:bg-gray-800 transition
                 duration-300 ease-in-out text-center shadow-md items-center"
             >
-              <p className="text-2xl font-bold text-black dark:text-white my-4">Transparency</p>
+              <p className="text-2xl font-bold text-black dark:text-white my-4">Privacy</p>
 
               <p className="text-gray-800 dark:text-gray-300 p-3 text-[16px] flex-wrap-wrap ">
-                Clear communication and honest reporting at every step of our
-                collaboration.
+                We don't track your data or sell your information. Your chats belong only to you.
               </p>
             </div>
 

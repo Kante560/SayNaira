@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext";
-import { MessageCircle, Home, User, LogOut, PlusSquare, Search } from "lucide-react";
+import { Bell, Home, User, LogOut, PlusSquare, Search } from "lucide-react";
 import { motion } from "framer-motion";
+import { NotificationBell } from "../_component_/NotificationBell";
 
 export const Nav = () => {
   const { user, logout } = useAuth();
@@ -37,7 +38,9 @@ export const Nav = () => {
     );
   }
 
-  // APP NAVIGATION (Logged In)
+  // MOBILE TOP BAR (Logo + Actions) - Hidden on chat pages
+  const isChatPage = location.pathname.startsWith("/chat/");
+
   return (
     <>
       {/* DESKTOP TOP HEADER */}
@@ -54,7 +57,7 @@ export const Nav = () => {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Profile placeholder or smaller link */}
+          <NotificationBell />
           <button onClick={logout} className="text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition" aria-label="Logout">
             <LogOut size={20} />
           </button>
@@ -62,27 +65,29 @@ export const Nav = () => {
       </header>
 
       {/* MOBILE TOP BAR (Logo + Actions) */}
-      <header className="fixed top-0 w-full bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800 z-40 h-14 flex md:hidden items-center justify-between px-4 transition-colors duration-300">
-        <span className="font-bold text-lg text-green-600">SayLess</span>
-        <div className="flex items-center gap-3">
-          <Link to="/messages" className="text-gray-700 dark:text-gray-200">
-            <MessageCircle size={24} strokeWidth={1.5} />
-          </Link>
-        </div>
-      </header>
+      {!isChatPage && (
+        <header className="fixed top-0 w-full bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800 z-40 h-14 flex md:hidden items-center justify-between px-4 transition-colors duration-300">
+          <span className="font-bold text-lg text-green-600">SayLess</span>
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+          </div>
+        </header>
+      )}
 
       {/* MOBILE BOTTOM TAB BAR */}
-      <nav className="fixed bottom-0 w-full bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 z-50 h-16 flex md:hidden items-center justify-around pb-safe transition-colors duration-300">
-        <NavLinkMobile to="/" icon={<Home size={24} />} active={isActive("/")} />
-        <NavLinkMobile to="/blog" icon={<Search size={24} />} active={isActive("/blog")} />
-        <div className="relative -top-5">
-          <Link to="/create-post" className="w-14 h-14 bg-green-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-green-200 dark:shadow-none">
-            <PlusSquare size={24} />
-          </Link>
-        </div>
-        <NavLinkMobile to="/messages" icon={<MessageCircle size={24} />} active={isActive("/messages")} />
-        <NavLinkMobile to="/profile" icon={<User size={24} />} active={isActive("/profile")} />
-      </nav>
+      {!isChatPage && (
+        <nav className="fixed bottom-0 w-full bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 z-50 h-16 flex md:hidden items-center justify-around pb-safe transition-colors duration-300">
+          <NavLinkMobile to="/" icon={<Home size={24} />} active={isActive("/")} />
+          <NavLinkMobile to="/blog" icon={<Search size={24} />} active={isActive("/blog")} />
+          <div className="relative -top-5">
+            <Link to="/create-post" className="w-14 h-14 bg-green-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-green-200 dark:shadow-none">
+              <PlusSquare size={24} />
+            </Link>
+          </div>
+          <NavLinkMobile to="/notifications" icon={<Bell size={24} />} active={isActive("/notifications")} />
+          <NavLinkMobile to="/profile" icon={<User size={24} />} active={isActive("/profile")} />
+        </nav>
+      )}
     </>
   );
 };
