@@ -27,6 +27,7 @@ export const Chat = () => {
   const [recipientInfo, setRecipientInfo] = useState(null);
   const [isOnline, setIsOnline] = useState(false);
   const [isStickerPickerOpen, setIsStickerPickerOpen] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef(null);
 
   const chatId = [user.uid, recipientId].sort().join("_");
@@ -86,7 +87,10 @@ export const Chat = () => {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    if (!message.trim()) return;
+    if (!message.trim() || isSending) return;
+
+    setIsSending(true);
+    const messageText = message.trim();
 
     try {
       await setDoc(
@@ -96,7 +100,7 @@ export const Chat = () => {
       );
 
       await addDoc(collection(db, "chats", chatId, "messages"), {
-        text: message,
+        text: messageText,
         senderId: user.uid,
         receiverId: recipientId,
         timestamp: serverTimestamp(),
@@ -109,7 +113,7 @@ export const Chat = () => {
         senderId: user.uid,
         senderEmail: user.email,
         senderName: user.displayName || user.email,
-        message: message.slice(0, 50),
+        message: messageText.slice(0, 50),
         chatId: chatId,
         read: false,
         timestamp: serverTimestamp(),
@@ -118,10 +122,16 @@ export const Chat = () => {
       setMessage("");
     } catch (err) {
       console.error("Failed to send message:", err);
+    } finally {
+      setIsSending(false);
     }
   };
 
   const sendSticker = async (sticker) => {
+    if (isSending) return;
+    
+    setIsSending(true);
+    
     try {
       await setDoc(
         doc(db, "chats", chatId),
@@ -152,6 +162,8 @@ export const Chat = () => {
       });
     } catch (err) {
       console.error("Failed to send sticker:", err);
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -242,7 +254,8 @@ export const Chat = () => {
             <button
               type="button"
               onClick={() => setIsStickerPickerOpen(!isStickerPickerOpen)}
-              className="p-2 text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition flex-shrink-0"
+              disabled={isSending}
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Smile size={20} />
             </button>
@@ -251,11 +264,12 @@ export const Chat = () => {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Message..."
-              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-sm py-2 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white"
+              disabled={isSending}
+              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-sm py-2 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white disabled:opacity-50"
             />
             <button
               type="submit"
-              disabled={!message.trim()}
+              disabled={!message.trim() || isSending}
               className="p-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
             >
               <Send size={16} />
