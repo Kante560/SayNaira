@@ -15,7 +15,7 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { useAuth } from "../Context/AuthContext";
-import { ArrowLeft, Send, Check, Smile } from "lucide-react";
+import { ArrowLeft, Send, Check, Smile, MoreVertical, Edit, X, Trash2 } from "lucide-react";
 import { StickerPicker } from "./StickerPicker";
 
 export const Chat = () => {
@@ -28,6 +28,9 @@ export const Chat = () => {
   const [isOnline, setIsOnline] = useState(false);
   const [isStickerPickerOpen, setIsStickerPickerOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [editText, setEditText] = useState("");
+  const [showMenu, setShowMenu] = useState(null);
   const messagesEndRef = useRef(null);
 
   const chatId = [user.uid, recipientId].sort().join("_");
@@ -88,6 +91,11 @@ export const Chat = () => {
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!message.trim() || isSending) return;
+
+    // Cancel any ongoing edit when sending a new message
+    if (editingMessage) {
+      handleEditCancel();
+    }
 
     setIsSending(true);
     const messageText = message.trim();
@@ -167,6 +175,70 @@ export const Chat = () => {
     }
   };
 
+  // Edit message functions
+  const handleEditClick = (msg) => {
+    setEditingMessage(msg.id);
+    setEditText(msg.text);
+    setShowMenu(null);
+  };
+
+  const handleEditSubmit = async (msgId) => {
+    if (!editText.trim() || isSending) return;
+
+    setIsSending(true);
+    try {
+      await updateDoc(doc(db, "chats", chatId, "messages", msgId), {
+        text: editText.trim(),
+        edited: true,
+        editedAt: serverTimestamp(),
+      });
+      
+      setEditingMessage(null);
+      setEditText("");
+    } catch (err) {
+      console.error("Failed to edit message:", err);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditingMessage(null);
+    setEditText("");
+  };
+
+  const handleDelete = async (msgId) => {
+    if (!window.confirm("Are you sure you want to delete this message for everyone?")) {
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, "chats", chatId, "messages", msgId), {
+        deletedForEveryone: true,
+        text: "This message was deleted",
+      });
+      setShowMenu(null);
+    } catch (err) {
+      console.error("Failed to delete message:", err);
+    }
+  };
+
+  const toggleMenu = (msgId) => {
+    setShowMenu(showMenu === msgId ? null : msgId);
+  };
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.message-menu')) {
+        setShowMenu(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
 
   const formatTime = (timestamp) => {
     if (!timestamp) return "";
@@ -205,8 +277,12 @@ export const Chat = () => {
           </div>
         </div>
 
+
+
+        
+
         {/* Messages Area - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900 transition-colors no-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 space-y-10 bg-gray-50 dark:bg-gray-900 transition-colors no-scrollbar">
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -219,27 +295,113 @@ export const Chat = () => {
                     : msg.type === "sticker" ? "" : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none"
                   }`}
               >
-                {/* Render sticker or text */}
-                {msg.type === "sticker" ? (
-                  <div>
-                    <img
-                      src={msg.stickerUrl}
-                      alt={msg.stickerName || "Sticker"}
-                      className="w-32 h-32 object-contain"
+                {/* Edit mode */}
+                {editingMessage === msg.id && msg.type !== "sticker" ? (
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="text"
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleEditSubmit(msg.id);
+                        } else if (e.key === 'Escape') {
+                          handleEditCancel();
+                        }
+                      }}
+                      className="bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      autoFocus
+                      disabled={isSending}
                     />
-                    <div className="text-[10px] mt-1 flex items-center justify-end gap-1 text-gray-400 dark:text-gray-500">
-                      <span>{formatTime(msg.timestamp)}</span>
-                      {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500" />}
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={handleEditCancel}
+                        disabled={isSending}
+                        className="px-3 py-1 text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-300 dark:hover:bg-gray-500 transition disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleEditSubmit(msg.id)}
+                        disabled={!editText.trim() || isSending}
+                        className="px-3 py-1 text-xs bg-green-600 text-white rounded-full hover:bg-green-700 transition disabled:opacity-50"
+                      >
+                        Save
+                      </button>
                     </div>
                   </div>
                 ) : (
                   <>
-                    <p className="text-[15px]">{msg.text}</p>
-                    <div className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${msg.senderId === user.uid ? "text-green-100" : "text-gray-400 dark:text-gray-500"}`}>
-                      <span>{formatTime(msg.timestamp)}</span>
-                      {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} />}
-                    </div>
+                    {/* Render sticker or text */}
+                    {msg.type === "sticker" ? (
+                      <div>
+                        <img
+                          src={msg.stickerUrl}
+                          alt={msg.stickerName || "Sticker"}
+                          className="w-32 h-32 object-contain"
+                        />
+                        <div className="text-[10px] mt-1 flex items-center justify-end gap-1 text-gray-400 dark:text-gray-500">
+                          <span>{formatTime(msg.timestamp)}</span>
+                          {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500" />}
+                        </div>
+                      </div>
+                    ) : (
+                  <div>
+                    {msg.deletedForEveryone ? (
+                      <div>
+                        <p className="text-[15px] italic text-gray-400 dark:text-gray-500">This message was deleted</p>
+                        <div className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${msg.senderId === user.uid ? "text-green-100" : "text-gray-400 dark:text-gray-500"}`}>
+                          <span>{formatTime(msg.timestamp)}</span>
+                          {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} />}
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-[15px]">{msg.text}</p>
+                        {msg.edited && (
+                          <span className="text-[10px] italic text-gray-400 dark:text-gray-500"> (edited)</span>
+                        )}
+                        <div className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${msg.senderId === user.uid ? "text-green-100" : "text-gray-400 dark:text-gray-500"}`}>
+                          <span>{formatTime(msg.timestamp)}</span>
+                          {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} />}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
                   </>
+                )}
+
+                {/* Menu for own messages */}
+                {msg.senderId === user.uid && msg.type !== "sticker" && editingMessage !== msg.id && (
+                  <div className="message-menu relative">
+                    <button
+                      onClick={() => toggleMenu(msg.id)}
+                      className="absolute top-1 -right-4 w-5 h-5 bg-green-700 dark:bg-green-800 rounded-full flex items-center justify-center hover:bg-green-800 dark:hover:bg-green-900 transition"
+                    >
+                      <MoreVertical size={10} className="text-green-200 dark:text-green-300" />
+                    </button>
+
+                    {showMenu === msg.id && (
+                      <div className="absolute top-6 right-0 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-1 z-50 border border-gray-200 dark:border-gray-700">
+                        <button
+                          onClick={() => handleEditClick(msg)}
+                          className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition w-full text-left"
+                        >
+                          <Edit size={14} />
+                          <span className="text-gray-700 dark:text-gray-300">Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDelete(msg.id)}
+                          className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition w-full text-left"
+                        >
+                          <Trash2 size={14} />
+                          <span className="text-red-600 dark:text-red-400">Delete</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -262,7 +424,13 @@ export const Chat = () => {
 
             <input
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                // Cancel edit if user starts typing a new message
+                if (editingMessage) {
+                  handleEditCancel();
+                }
+              }}
               placeholder="Message..."
               disabled={isSending}
               className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-sm py-2 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white disabled:opacity-50"

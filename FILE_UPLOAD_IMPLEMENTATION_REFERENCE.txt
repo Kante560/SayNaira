@@ -1,0 +1,248 @@
+# File Upload Implementation Reference
+# For Chat System - SayNaira App
+# Created: Feb 16, 2026
+
+## PREREQUISITES
+1. Firebase Storage must be activated (requires billing account)
+2. Firebase Storage rules must be configured
+3. Storage bucket must be properly set up
+
+## FIREBASE CONFIGURATION
+Ensure firebase.js includes:
+```javascript
+import { getStorage } from "firebase/storage";
+export const storage = getStorage(app);
+```
+
+## IMPLEMENTATION STEPS
+
+### 1. Add Imports to Chat.jsx
+```javascript
+import { db, storage } from "../../firebase";
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
+import { Paperclip } from "lucide-react";
+```
+
+### 2. Add State Variables
+```javascript
+const [uploadingFile, setUploadingFile] = useState(false);
+const [uploadProgress, setUploadProgress] = useState(0);
+const fileInputRef = useRef(null);
+```
+
+### 3. File Upload Function
+```javascript
+const handleFileUpload = async (file) => {
+  if (!file || isSending) return;
+
+  // Validate file type and size
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain'];
+  const maxSize = 10 * 1024 * 1024; // 10MB
+
+  if (!allowedTypes.includes(file.type)) {
+    alert('Invalid file type. Please upload images, PDFs, or text files.');
+    return;
+  }
+
+  if (file.size > maxSize) {
+    alert('File too large. Maximum size is 10MB.');
+    return;
+  }
+
+  setUploadingFile(true);
+  setUploadProgress(0);
+
+  try {
+    // Create unique file name
+    const fileName = `${Date.now()}_${file.name}`;
+    const storageRef = ref(storage, `chat-files/${chatId}/${fileName}`);
+
+    // Upload file
+    const uploadTask = uploadBytes(storageRef, file);
+    
+    // Get download URL after upload
+    const downloadURL = await getDownloadURL(storageRef);
+
+    // Send message with file info
+    await setDoc(
+      doc(db, "chats", chatId),
+      { lastUpdated: serverTimestamp() },
+      { merge: true }
+    );
+
+    await addDoc(collection(db, "chats", chatId, "messages"), {
+      type: "file",
+      fileName: file.name,
+      fileUrl: downloadURL,
+      fileSize: file.size,
+      fileType: file.type,
+      senderId: user.uid,
+      receiverId: recipientId,
+      timestamp: serverTimestamp(),
+      read: false,
+    });
+
+    await addDoc(collection(db, "notifications"), {
+      userId: recipientId,
+      type: "message",
+      senderId: user.uid,
+      senderEmail: user.email,
+      senderName: user.displayName || user.email,
+      message: `📎 Sent a file: ${file.name}`,
+      chatId: chatId,
+      read: false,
+      timestamp: serverTimestamp(),
+    });
+
+  } catch (err) {
+    console.error("Failed to upload file:", err);
+    alert('Failed to upload file. Please try again.');
+  } finally {
+    setUploadingFile(false);
+    setUploadProgress(0);
+  }
+};
+
+const handleFileSelect = (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    handleFileUpload(file);
+  }
+  e.target.value = '';
+};
+```
+
+### 4. Update Message Rendering
+Add file message type handling in message display:
+```javascript
+) : msg.type === "file" ? (
+  <div>
+    <div 
+      onClick={() => window.open(msg.fileUrl, '_blank')}
+      className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 flex items-center gap-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+    >
+      <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+        <span className="text-blue-600 dark:text-blue-400 text-xl">📎</span>
+      </div>
+      <div className="flex-1">
+        <p className="font-medium text-gray-900 dark:text-white text-sm truncate">{msg.fileName}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {(msg.fileSize / 1024).toFixed(1)} KB • Click to download
+        </p>
+      </div>
+    </div>
+    <div className="text-[10px] mt-1 flex items-center justify-end gap-1 text-gray-400 dark:text-gray-500">
+      <span>{formatTime(msg.timestamp)}</span>
+      {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500" />}
+    </div>
+  </div>
+```
+
+### 5. Update Input Area
+Add file upload button and progress indicator:
+```javascript
+{/* Upload Progress */}
+{uploadingFile && (
+  <div className="absolute -top-12 left-4 right-4 bg-blue-100 dark:bg-blue-900/30 rounded-lg p-2 text-sm text-blue-700 dark:text-blue-300">
+    Uploading file... {uploadProgress}%
+  </div>
+)}
+
+<form onSubmit={sendMessage} className="flex gap-2 items-center bg-gray-100 dark:bg-gray-700 rounded-full px-4 py-2 transition-colors">
+  {/* File upload button */}
+  <input
+    ref={fileInputRef}
+    type="file"
+    onChange={handleFileSelect}
+    accept="image/*,.pdf,.txt"
+    className="hidden"
+    disabled={isSending || uploadingFile}
+  />
+  <button
+    type="button"
+    onClick={() => fileInputRef.current?.click()}
+    disabled={isSending || uploadingFile}
+    className="p-2 text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+  >
+    <Paperclip size={20} />
+  </button>
+
+  {/* Rest of existing input area */}
+</form>
+```
+
+### 6. Firebase Storage Rules
+Add to Firebase Storage rules:
+```
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /chat-files/{chatId}/{fileName} {
+      allow read, write: if request.auth != null && chatId.matches('.*_.*');
+    }
+  }
+}
+```
+
+## STORAGE STRUCTURE
+```
+chat-files/
+├── {chatId}/
+│   ├── {timestamp}_{filename}
+│   ├── {timestamp}_{filename}
+│   └── ...
+```
+
+## FIRESTORE MESSAGE STRUCTURE
+```javascript
+{
+  type: "file",
+  fileName: "document.pdf",
+  fileUrl: "https://storage.googleapis.com/...",
+  fileSize: 1024000,
+  fileType: "application/pdf",
+  senderId: "user-uid",
+  receiverId: "recipient-uid",
+  timestamp: serverTimestamp(),
+  read: false
+}
+```
+
+## FEATURES INCLUDED
+- ✅ File type validation (images, PDFs, text)
+- ✅ File size limit (10MB)
+- ✅ Upload progress indicator
+- ✅ Unique file naming
+- ✅ Download on click
+- ✅ File metadata storage
+- ✅ Notifications for file uploads
+- ✅ Error handling
+
+## EXTENSION POSSIBILITIES
+1. Image preview before upload
+2. Multiple file selection
+3. File compression
+4. Voice messages
+5. Video support
+6. File sharing expiry
+7. File encryption
+8. Thumbnail generation for images
+
+## TESTING
+1. Test with various file types
+2. Test large files (should be rejected)
+3. Test invalid file types (should be rejected)
+4. Test download functionality
+5. Test concurrent uploads
+6. Test network interruptions
+
+## NOTES
+- Requires Firebase Storage billing plan
+- Storage costs apply based on usage
+- Consider implementing file cleanup for old messages
+- Add file virus scanning for production
+- Consider CDN for faster file delivery

@@ -19,6 +19,9 @@ export const ChatList = () => {
   const [users, setUsers] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [onlineUsers, setOnlineUsers] = useState({});
+  const [showUserSearch, setShowUserSearch] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [filteredUsers, setFilteredUsers] = useState([]);
 
   // Fetch all users for the user directory (and stories/status style list)
   useEffect(() => {
@@ -32,6 +35,26 @@ export const ChatList = () => {
     };
     fetchUsers();
   }, []);
+
+  // Filter users based on search query
+  useEffect(() => {
+    if (!userSearchQuery.trim()) {
+      setFilteredUsers([]);
+      return;
+    }
+
+    const filtered = Object.entries(users)
+      .filter(([uid, u]) => uid !== user?.uid)
+      .filter(([uid, u]) => {
+        const name = (u.name || u.displayName || "").toLowerCase();
+        const email = (u.email || "").toLowerCase();
+        const query = userSearchQuery.toLowerCase();
+        return name.includes(query) || email.includes(query);
+      })
+      .map(([uid, u]) => ({ uid, ...u }));
+
+    setFilteredUsers(filtered);
+  }, [userSearchQuery, users, user]);
 
   // Listen to online status
   useEffect(() => {
@@ -123,10 +146,9 @@ export const ChatList = () => {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Chats</h1>
           <button
-            onClick={() => {
-              navigate('/blog')
-            }}
-            className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 transition">
+            onClick={() => setShowUserSearch(true)}
+            className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 transition"
+          >
             <Plus size={24} />
           </button>
         </div>
@@ -144,18 +166,18 @@ export const ChatList = () => {
         </div>
 
         {/* Online / Stories (Horizontal Scroll) */}
-        <div className="mb-8 overflow-x-auto no-scrollbar">
+        {/* <div className="mb-8 overflow-x-auto no-scrollbar">
           <div className="flex space-x-4 min-w-max p-1">
             {/* My Story (Placeholder) */}
-            <div className="flex flex-col items-center space-y-1 cursor-pointer">
+          {/*  <div className="flex flex-col items-center space-y-1 cursor-pointer">
               <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-800 border-2 border-dashed border-gray-400 dark:border-gray-600 flex items-center justify-center">
                 <Plus className="w-6 h-6 text-gray-500 dark:text-gray-400" />
               </div>
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Your Story</span>
-            </div>
+            </div> */}
 
             {/* Online Users */}
-            {Object.entries(users).map(([uid, u]) => {
+            {/* {Object.entries(users).map(([uid, u]) => {
               if (uid === user?.uid) return null;
               const isOnline = onlineUsers[uid];
 
@@ -174,9 +196,9 @@ export const ChatList = () => {
                   <span className="text-xs font-medium text-gray-700 dark:text-gray-300 max-w-[64px] truncate">{u.name || "User"}</span>
                 </div>
               );
-            })}
+            })} 
           </div>
-        </div>
+        </div> */}
 
         {/* Conversations List */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors">
@@ -237,6 +259,110 @@ export const ChatList = () => {
           )}
         </div>
       </div>
+
+      {/* User Search Modal */}
+      {showUserSearch && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-center pt-20">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md mx-4 rounded-2xl shadow-xl max-h-[80vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Search Users</h2>
+              <button
+                onClick={() => {
+                  setShowUserSearch(false);
+                  setUserSearchQuery("");
+                  setFilteredUsers([]);
+                }}
+                className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+              >
+                <Plus size={18} className="rotate-45 text-gray-500 dark:text-gray-400" />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="p-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Search by name or email..."
+                  value={userSearchQuery}
+                  onChange={(e) => setUserSearchQuery(e.target.value)}
+                  className="w-full bg-gray-50 dark:bg-gray-700 pl-10 pr-4 py-3 rounded-xl border-none focus:ring-2 focus:ring-green-500 outline-none placeholder-gray-400 dark:placeholder-gray-500 font-medium text-gray-900 dark:text-gray-100 transition-colors"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Search Results */}
+            <div className="flex-1 overflow-y-auto max-h-96">
+              {userSearchQuery.trim() && filteredUsers.length > 0 ? (
+                <div className="p-2">
+                  {filteredUsers.map((user) => {
+                    const isOnline = onlineUsers[user.uid];
+                    return (
+                      <div
+                        key={user.uid}
+                        onClick={() => {
+                          navigate(`/chat/${user.uid}`);
+                          setShowUserSearch(false);
+                          setUserSearchQuery("");
+                          setFilteredUsers([]);
+                        }}
+                        className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl cursor-pointer transition"
+                      >
+                        {/* Avatar */}
+                        <div className="relative flex-shrink-0">
+                          <div className={`w-12 h-12 rounded-full bg-gradient-to-tr ${isOnline ? "from-green-400 to-emerald-600" : "from-gray-400 to-gray-600"} p-[2px]`}>
+                            <div className="w-full h-full bg-white dark:bg-gray-800 rounded-full flex items-center justify-center font-bold text-gray-700 dark:text-gray-200 text-sm">
+                              {(user.name || user.displayName || user.email || "?").charAt(0).toUpperCase()}
+                            </div>
+                          </div>
+                          <div className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white dark:border-gray-800 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`}></div>
+                        </div>
+
+                        {/* User Info */}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-gray-900 dark:text-white truncate">
+                            {user.name || user.displayName || "User"}
+                          </h4>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                            {user.email}
+                          </p>
+                        </div>
+
+                        {/* Online Status */}
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${isOnline ? "bg-green-500" : "bg-gray-400"}`}></div>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {isOnline ? "Online" : "Offline"}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : userSearchQuery.trim() ? (
+                <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                  <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                    <Search className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No users found</h3>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm">Try searching with different keywords</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                  <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                    <Search className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Search for users</h3>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm">Type to search by name or email</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
