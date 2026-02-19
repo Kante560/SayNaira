@@ -650,7 +650,7 @@ export const Chat = () => {
                               className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center hover:bg-green-700 transition"
                             >
                               <span className="text-xs">
-                                {playingMessageId === msg.id && !currentAudioRef.current?.paused ? '⏸' : '▶'}
+                                {playingMessageId === msg.id && !currentAudioRef.current?.paused ? '❚❚' : '▶'}
                               </span>
                             </button>
                           </div>
