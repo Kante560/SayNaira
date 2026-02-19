@@ -62,7 +62,7 @@ export const CreatePost = () => {
                     <textarea
                         autoFocus
                         placeholder="What's happening?"
-                        className="w-full resize-none border-none focus:ring-0 text-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 min-h-[200px] bg-transparent transition-colors"
+                        className="w-full resize-none border-none text-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 min-h-[200px] bg-transparent focus:outline-none transition-all duration-200 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50"
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
                     />
@@ -70,9 +70,9 @@ export const CreatePost = () => {
             </div>
 
             <div className="fixed bottom-0 w-full border-t border-gray-100 dark:border-gray-800 p-4 pb-safe flex items-center gap-4 text-green-600 dark:text-green-400 bg-white dark:bg-gray-900 transition-colors">
-                <button className="p-2 bg-green-50 dark:bg-green-900/20 rounded-full hover:bg-green-100 dark:hover:bg-green-900/40 transition">
+                {/* <button className="p-2 bg-green-50 dark:bg-green-900/20 rounded-full hover:bg-green-100 dark:hover:bg-green-900/40 transition">
                     <ImageIcon size={24} />
-                </button>
+                </button> */}
             </div>
         </div>
     );

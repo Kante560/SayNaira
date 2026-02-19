@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { db } from "../../firebase";
 import { Nav } from "../Home/Nav";
+import { toast } from "react-hot-toast";
 import {
   collection,
   addDoc,
@@ -15,7 +16,7 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { useAuth } from "../Context/AuthContext";
-import { ArrowLeft, Send, Check, Smile, MoreVertical, Edit, X, Trash2 } from "lucide-react";
+import { ArrowLeft, Send, Check, Smile, MoreVertical, Edit, X, Trash2, Mic, Square } from "lucide-react";
 import { StickerPicker } from "./StickerPicker";
 
 export const Chat = () => {
@@ -31,12 +32,84 @@ export const Chat = () => {
   const [editingMessage, setEditingMessage] = useState(null);
   const [editText, setEditText] = useState("");
   const [showMenu, setShowMenu] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const messagesEndRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingIntervalRef = useRef(null);
+  const currentAudioRef = useRef(null);
+  const [playingMessageId, setPlayingMessageId] = useState(null);
+  const [currentPlaybackTime, setCurrentPlaybackTime] = useState(0);
+  const playbackIntervalRef = useRef(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState(null);
 
   const chatId = [user.uid, recipientId].sort().join("_");
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const playVoiceNote = (audioData, messageId) => {
+    // Check if the same audio is already playing
+    if (currentAudioRef.current && currentAudioRef.current.src === audioData) {
+      if (currentAudioRef.current.paused) {
+        // Resume if paused
+        currentAudioRef.current.play().catch((error) => {
+          console.error("Audio resume failed:", error);
+        });
+        startPlaybackTimer();
+      } else {
+        // Pause if playing
+        currentAudioRef.current.pause();
+        stopPlaybackTimer();
+      }
+      return;
+    }
+
+    // Stop any currently playing audio (different one)
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+    }
+    stopPlaybackTimer();
+
+    // Create and play new audio
+    const audio = new Audio(audioData);
+    currentAudioRef.current = audio;
+    setPlayingMessageId(messageId);
+    setCurrentPlaybackTime(0);
+    
+    audio.play().catch((error) => {
+      console.error("Audio playback failed:", error);
+    });
+
+    startPlaybackTimer();
+
+    // Clear reference when audio finishes
+    audio.onended = () => {
+      currentAudioRef.current = null;
+      setPlayingMessageId(null);
+      setCurrentPlaybackTime(0);
+      stopPlaybackTimer();
+    };
+  };
+
+  const startPlaybackTimer = () => {
+    stopPlaybackTimer(); // Clear any existing timer
+    playbackIntervalRef.current = setInterval(() => {
+      if (currentAudioRef.current) {
+        setCurrentPlaybackTime(currentAudioRef.current.currentTime);
+      }
+    }, 1000); // Update every 1 second (no milliseconds)
+  };
+
+  const stopPlaybackTimer = () => {
+    if (playbackIntervalRef.current) {
+      clearInterval(playbackIntervalRef.current);
+      playbackIntervalRef.current = null;
+    }
   };
 
   useEffect(() => {
@@ -88,6 +161,17 @@ export const Chat = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Cleanup audio on component unmount
+  useEffect(() => {
+    return () => {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current.currentTime = 0;
+      }
+      stopPlaybackTimer();
+    };
+  }, []);
+
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!message.trim() || isSending) return;
@@ -137,9 +221,9 @@ export const Chat = () => {
 
   const sendSticker = async (sticker) => {
     if (isSending) return;
-    
+
     setIsSending(true);
-    
+
     try {
       await setDoc(
         doc(db, "chats", chatId),
@@ -192,7 +276,7 @@ export const Chat = () => {
         edited: true,
         editedAt: serverTimestamp(),
       });
-      
+
       setEditingMessage(null);
       setEditText("");
     } catch (err) {
@@ -208,19 +292,200 @@ export const Chat = () => {
   };
 
   const handleDelete = async (msgId) => {
-    if (!window.confirm("Are you sure you want to delete this message for everyone?")) {
-      return;
-    }
+    console.log("Delete clicked for message ID:", msgId);
+    setMessageToDelete(msgId);
+    setShowDeleteConfirm(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!messageToDelete) return;
+    
+    console.log("Attempting to delete message from Firestore...");
+    console.log("Chat ID:", chatId);
+    console.log("Message ID:", messageToDelete);
+    
+    // Find the message to determine its type
+    const messageToDeleteData = messages.find(msg => msg.id === messageToDelete);
+    console.log("Message to delete:", messageToDeleteData);
+    
+    const updateData = {
+      deletedForEveryone: true,
+    };
+    
+    // Set appropriate deleted message based on type
+    if (messageToDeleteData?.type === "voice") {
+      updateData.audioData = null;
+      updateData.text = "🎤 Voice note deleted";
+      console.log("Deleting voice note");
+    } else {
+      updateData.text = "This message was deleted";
+      console.log("Deleting text message");
+    }
+    
+    console.log("Update data:", updateData);
+    
     try {
-      await updateDoc(doc(db, "chats", chatId, "messages", msgId), {
-        deletedForEveryone: true,
-        text: "This message was deleted",
-      });
-      setShowMenu(null);
+      await updateDoc(doc(db, "chats", chatId, "messages", messageToDelete), updateData);
+      
+      console.log("Message successfully deleted");
+      
+      // Update local state immediately to reflect deletion
+      setMessages(prevMessages => 
+        prevMessages.map(msg => 
+          msg.id === messageToDelete 
+            ? { ...msg, ...updateData }
+            : msg
+        )
+      );
+      
+      console.log("Local state updated");
+      
+      // Show success toast
+      toast.success("Message deleted successfully");
     } catch (err) {
       console.error("Failed to delete message:", err);
+      console.error("Error details:", err.code, err.message);
+    } finally {
+      setShowDeleteConfirm(false);
+      setMessageToDelete(null);
+      setShowMenu(null);
     }
+  };
+
+  const cancelDelete = () => {
+    console.log("Delete cancelled by user");
+    setShowDeleteConfirm(false);
+    setMessageToDelete(null);
+  };
+
+  // Voice recording functions
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        audioChunksRef.current = [];
+
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
+
+        // Send voice note
+        await sendVoiceNote(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      // Start recording timer
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+
+    } catch (err) {
+      console.error("Error starting recording:", err);
+      alert("Failed to access microphone. Please check permissions.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+
+      // Clear recording timer
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+
+      // Store the final recording time before resetting
+      const finalRecordingTime = recordingTime;
+      
+      // Send voice note with the captured duration
+      setTimeout(() => {
+        sendVoiceNoteWithDuration(finalRecordingTime);
+      }, 100);
+
+      setRecordingTime(0);
+    }
+  };
+
+  const sendVoiceNoteWithDuration = async (duration) => {
+    // This will be called from the mediaRecorder.onstop callback
+    // We'll store the duration and wait for the audio blob
+    window.pendingVoiceNoteDuration = duration;
+  };
+
+  const sendVoiceNote = async (audioBlob, duration = null) => {
+    setIsSending(true);
+
+    try {
+      // For now, we'll store the audio as a base64 string in Firestore
+      // Later, this can be moved to Firebase Storage
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+
+      reader.onloadend = async () => {
+        const base64Audio = reader.result;
+
+        // Update chat document
+        await setDoc(
+          doc(db, "chats", chatId),
+          { lastUpdated: serverTimestamp() },
+          { merge: true }
+        );
+
+        // Add voice message to Firestore
+        await addDoc(collection(db, "chats", chatId, "messages"), {
+          type: "voice",
+          audioData: base64Audio,
+          duration: duration || window.pendingVoiceNoteDuration || 0,
+          senderId: user.uid,
+          receiverId: recipientId,
+          timestamp: serverTimestamp(),
+          read: false,
+        });
+
+        // Clear the pending duration
+        window.pendingVoiceNoteDuration = null;
+
+        // Send notification
+        await addDoc(collection(db, "notifications"), {
+          userId: recipientId,
+          type: "message",
+          senderId: user.uid,
+          senderEmail: user.email,
+          senderName: user.displayName || user.email,
+          message: "🎤 Sent a voice note",
+          chatId: chatId,
+          read: false,
+          timestamp: serverTimestamp(),
+        });
+      };
+
+    } catch (err) {
+      console.error("Failed to send voice note:", err);
+      alert("Failed to send voice note. Please try again.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const formatRecordingTime = (seconds) => {
+    const roundedSeconds = Math.round(seconds);
+    const mins = Math.floor(roundedSeconds / 60);
+    const secs = roundedSeconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const toggleMenu = (msgId) => {
@@ -237,6 +502,18 @@ export const Chat = () => {
 
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+    };
   }, []);
 
 
@@ -279,7 +556,7 @@ export const Chat = () => {
 
 
 
-        
+
 
         {/* Messages Area - Scrollable */}
         <div className="flex-1 overflow-y-auto p-4 space-y-10 bg-gray-50 dark:bg-gray-900 transition-colors no-scrollbar">
@@ -333,7 +610,7 @@ export const Chat = () => {
                   </div>
                 ) : (
                   <>
-                    {/* Render sticker or text */}
+                    {/* Render sticker, voice, or text */}
                     {msg.type === "sticker" ? (
                       <div>
                         <img
@@ -346,16 +623,53 @@ export const Chat = () => {
                           {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500" />}
                         </div>
                       </div>
-                    ) : (
-                  <div>
-                    {msg.deletedForEveryone ? (
-                      <div>
-                        <p className="text-[15px] italic text-gray-400 dark:text-gray-500">This message was deleted</p>
-                        <div className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${msg.senderId === user.uid ? "text-green-100" : "text-gray-400 dark:text-gray-500"}`}>
-                          <span>{formatTime(msg.timestamp)}</span>
-                          {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} />}
+                    ) : msg.type === "voice" ? (
+                      msg.deletedForEveryone ? (
+                        <div className="text-gray-500 dark:text-gray-400 italic text-sm">
+                          🎤 Voice note deleted
                         </div>
-                      </div>
+                      ) : (
+                        <div>
+                          <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 flex items-center gap-3">
+                            <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+                              <span className="text-red-600 dark:text-red-400 text-xl">🎤</span>
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900 dark:text-white text-sm">Voice Note</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {playingMessageId === msg.id 
+                                  ? formatRecordingTime(currentPlaybackTime)
+                                  : msg.duration 
+                                    ? formatRecordingTime(msg.duration) 
+                                    : "0:00"
+                                }
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => playVoiceNote(msg.audioData, msg.id)}
+                              className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center hover:bg-green-700 transition"
+                            >
+                              <span className="text-xs">
+                                {playingMessageId === msg.id && !currentAudioRef.current?.paused ? '⏸' : '▶'}
+                              </span>
+                            </button>
+                          </div>
+                          {/* Delete button for own voice notes */}
+                          {msg.senderId === user.uid && (
+                            <button
+                              onClick={() => handleDelete(msg.id)}
+                              className="w-6 h-6 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 transition"
+                              title="Delete voice note"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                          <div className="text-[10px] mt-1 flex items-center justify-end gap-1 text-gray-400 dark:text-gray-500">
+                            <span>{formatTime(msg.timestamp)}</span>
+                            {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500" />}
+                          </div>
+                        </div>
+                      )
                     ) : (
                       <>
                         <p className="text-[15px]">{msg.text}</p>
@@ -368,13 +682,11 @@ export const Chat = () => {
                         </div>
                       </>
                     )}
-                  </div>
-                )}
                   </>
                 )}
 
                 {/* Menu for own messages */}
-                {msg.senderId === user.uid && msg.type !== "sticker" && editingMessage !== msg.id && (
+                {msg.senderId === user.uid && msg.type !== "sticker" && msg.type !== "voice" && editingMessage !== msg.id && (
                   <div className="message-menu relative">
                     <button
                       onClick={() => toggleMenu(msg.id)}
@@ -411,12 +723,43 @@ export const Chat = () => {
 
         {/* Input Area - Fixed at bottom */}
         <div className="p-3 bg-white dark:bg-gray-800 border-t dark:border-gray-700 transition-colors mb-0 relative">
+          {/* Recording indicator */}
+          {isRecording && (
+            <div className="absolute -top-16 left-4 right-4 bg-red-100 dark:bg-red-900/30 rounded-lg p-3 flex items-center gap-2 z-50">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                <span className="text-red-700 dark:text-red-300 text-sm font-medium">
+                  Recording... {formatRecordingTime(recordingTime)}
+                </span>
+              </div>
+              <button
+                onClick={stopRecording}
+                className="px-3 py-1 text-xs bg-red-600 text-white rounded-full hover:bg-red-700 transition"
+              >
+                Stop
+              </button>
+            </div>
+          )}
+
           <form onSubmit={sendMessage} className="flex gap-2 items-center bg-gray-100 dark:bg-gray-700 rounded-full px-4 py-2 transition-colors">
+            {/* Voice recording button */}
+            <button
+              type="button"
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={isSending}
+              className={`p-2 rounded-full flex items-center justify-center transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${isRecording
+                  ? 'bg-red-600 text-white hover:bg-red-700 animate-pulse'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400'
+                }`}
+            >
+              {isRecording ? <Square size={20} /> : <Mic size={20} />}
+            </button>
+
             {/* Sticker button */}
             <button
               type="button"
               onClick={() => setIsStickerPickerOpen(!isStickerPickerOpen)}
-              disabled={isSending}
+              disabled={isSending || isRecording}
               className="p-2 text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Smile size={20} />
@@ -432,12 +775,12 @@ export const Chat = () => {
                 }
               }}
               placeholder="Message..."
-              disabled={isSending}
+              disabled={isSending || isRecording}
               className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-sm py-2 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white disabled:opacity-50"
             />
             <button
               type="submit"
-              disabled={!message.trim() || isSending}
+              disabled={!message.trim() || isSending || isRecording}
               className="p-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
             >
               <Send size={16} />
@@ -450,6 +793,34 @@ export const Chat = () => {
             onClose={() => setIsStickerPickerOpen(false)}
             onSelectSticker={sendSticker}
           />
+
+          {/* Delete Confirmation Dialog */}
+          {showDeleteConfirm && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm mx-4 shadow-xl">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Delete Message
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300 mb-6">
+                  Are you sure you want to delete this message for everyone? This action cannot be undone.
+                </p>
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={cancelDelete}
+                    className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDelete}
+                    className="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 transition"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

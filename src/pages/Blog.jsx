@@ -287,14 +287,14 @@ export const Blog = () => {
               <div className="flex-1">
                 <textarea
                   placeholder="What's happening?"
-                  className="w-full resize-none border-none focus:ring-0 text-lg dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 min-h-[80px] bg-transparent"
+                  className="w-full resize-none border-none text-lg dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 min-h-[80px] bg-transparent focus:outline-none transition-all duration-200 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                 />
                 <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-50 dark:border-gray-700">
-                  <button className="text-green-600 dark:text-green-400 p-2 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-full transition">
+                  {/* <button className="text-green-600 dark:text-green-400 p-2 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-full transition">
                     <ImageIcon size={20} />
-                  </button>
+                  </button> */}
                   <button
                     onClick={handlePostSubmit}
                     disabled={!content.trim()}
@@ -347,9 +347,9 @@ export const Blog = () => {
                       </p>
                     </div>
                   </div>
-                  <button className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
+                  {/* <button className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
                     <MoreHorizontal size={20} />
-                  </button>
+                  </button> */}
                 </div>
 
                 {/* Post Content */}
@@ -499,7 +499,7 @@ export const Blog = () => {
                                   handleCommentSubmit(post.id);
                                 }
                               }}
-                              className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                              className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 border-0 rounded-full text-sm focus:outline-none transition-all duration-200 hover:bg-gray-200 dark:hover:bg-gray-600 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                             />
                             <button
                               onClick={() => handleCommentSubmit(post.id)}

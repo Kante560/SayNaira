@@ -95,6 +95,8 @@ export const ChatList = () => {
           if (lastMessageDoc) {
             if (lastMessageDoc.type === "sticker") {
               lastMessageText = "🎨 Sticker";
+            } else if (lastMessageDoc.type === "voice") {
+              lastMessageText = "🎤 Voice note";
             } else {
               lastMessageText = lastMessageDoc.text || "";
             }
