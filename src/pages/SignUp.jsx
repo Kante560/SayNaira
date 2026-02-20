@@ -3,13 +3,15 @@ import { toast } from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext";
 import { Nav } from "../Home/Nav";
+import { Chrome } from "lucide-react";
 
 const SignUp = () => {
-  const { signup } = useAuth();
+  const { signup, loginWithGoogle } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSignUp = async (e) => {
@@ -24,6 +26,20 @@ const SignUp = () => {
       toast.error(err.message || "Signup failed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    try {
+      setGoogleLoading(true);
+      await loginWithGoogle();
+      toast.success("Welcome to SayLess!");
+      navigate("/");
+    } catch (err) {
+      console.error("Google signup failed:", err.message);
+      toast.error(err.message || "Google signup failed");
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -102,6 +118,24 @@ const SignUp = () => {
             className="w-full py-3 rounded-lg bg-green-600 text-white font-bold hover:bg-green-700 transition disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {loading ? "Creating Account..." : "Sign Up"}
+          </button>
+
+          {/* Divider */}
+          <div className="flex items-center my-4">
+            <div className="flex-1 h-px bg-gray-300 dark:border-gray-600"></div>
+            <span className="px-3 text-sm text-gray-500 dark:text-gray-400">OR</span>
+            <div className="flex-1 h-px bg-gray-300 dark:border-gray-600"></div>
+          </div>
+
+          {/* Google Sign-In Button */}
+          <button
+            type="button"
+            onClick={handleGoogleSignUp}
+            disabled={googleLoading}
+            className="w-full py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+          >
+            <Chrome size={20} className="text-blue-500" />
+            {googleLoading ? "Signing up..." : "Sign up with Google"}
           </button>
 
           <p className="text-center mt-6 text-gray-600 dark:text-gray-400">

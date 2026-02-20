@@ -4,6 +4,8 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "firebase/auth";
 import { auth, db } from "../../firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -31,6 +33,23 @@ export const AuthProvider = ({ children }) => {
 
   const login = (email, password) => {
     return signInWithEmailAndPassword(auth, email, password);
+  };
+
+  const loginWithGoogle = async () => {
+    const provider = new GoogleAuthProvider();
+    const userCredential = await signInWithPopup(auth, provider);
+    const user = userCredential.user;
+    
+    // Create user document in Firestore if it doesn't exist
+    await setDoc(doc(db, "users", user.uid), {
+      email: user.email,
+      uid: user.uid,
+      name: user.displayName || "",
+      photoURL: user.photoURL || "",
+      createdAt: serverTimestamp(),
+    }, { merge: true });
+    
+    return userCredential;
   };
 
   const logout = async () => {
@@ -81,7 +100,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, login, loginWithGoogle, signup, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );
