@@ -11,6 +11,7 @@ import {
 import { useAuth } from "../Context/AuthContext";
 import { Nav } from "../Home/Nav";
 import { MessageCircle, Search, Plus } from "lucide-react";
+import { Avatar } from "../_component_/Avatar";
 
 export const ChatList = () => {
   const { user } = useAuth();
@@ -114,6 +115,7 @@ export const ChatList = () => {
             otherUserId,
             otherUserName: otherUserData?.name || otherUserData?.displayName || "User",
             otherUserEmail: otherUserData?.email || "",
+            otherUserPhotoURL: otherUserData?.photoURL || "",
             lastMessage: lastMessageText,
             timestamp: lastMessageDoc?.timestamp,
             unreadCount,
@@ -171,15 +173,15 @@ export const ChatList = () => {
         {/* <div className="mb-8 overflow-x-auto no-scrollbar">
           <div className="flex space-x-4 min-w-max p-1">
             {/* My Story (Placeholder) */}
-          {/*  <div className="flex flex-col items-center space-y-1 cursor-pointer">
+        {/*  <div className="flex flex-col items-center space-y-1 cursor-pointer">
               <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-800 border-2 border-dashed border-gray-400 dark:border-gray-600 flex items-center justify-center">
                 <Plus className="w-6 h-6 text-gray-500 dark:text-gray-400" />
               </div>
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Your Story</span>
             </div> */}
 
-            {/* Online Users */}
-            {/* {Object.entries(users).map(([uid, u]) => {
+        {/* Online Users */}
+        {/* {Object.entries(users).map(([uid, u]) => {
               if (uid === user?.uid) return null;
               const isOnline = onlineUsers[uid];
 
@@ -213,9 +215,12 @@ export const ChatList = () => {
               >
                 {/* Avatar */}
                 <div className="relative flex-shrink-0">
-                  <div className="w-14 h-14 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 font-bold text-xl transition-colors">
-                    {(conv.otherUserName).charAt(0).toUpperCase()}
-                  </div>
+                  <Avatar
+                    src={conv.otherUserPhotoURL}
+                    name={conv.otherUserName || conv.otherUserEmail}
+                    size="w-14 h-14"
+                    textSize="text-xl"
+                  />
                   <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-white dark:border-gray-800 rounded-full ${onlineUsers[conv.otherUserId] ? "bg-green-500" : "bg-red-500"}`}></div>
                 </div>
 
@@ -315,10 +320,13 @@ export const ChatList = () => {
                       >
                         {/* Avatar */}
                         <div className="relative flex-shrink-0">
-                          <div className={`w-12 h-12 rounded-full bg-gradient-to-tr ${isOnline ? "from-green-400 to-emerald-600" : "from-gray-400 to-gray-600"} p-[2px]`}>
-                            <div className="w-full h-full bg-white dark:bg-gray-800 rounded-full flex items-center justify-center font-bold text-gray-700 dark:text-gray-200 text-sm">
-                              {(user.name || user.displayName || user.email || "?").charAt(0).toUpperCase()}
-                            </div>
+                          <div className={`p-[2px] rounded-full ${isOnline ? "bg-gradient-to-tr from-green-400 to-emerald-600" : "bg-gray-300 dark:bg-gray-600"}`}>
+                            <Avatar
+                              src={user.photoURL}
+                              name={user.name || user.displayName || user.email}
+                              size="w-12 h-12"
+                              textSize="text-sm"
+                            />
                           </div>
                           <div className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white dark:border-gray-800 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`}></div>
                         </div>

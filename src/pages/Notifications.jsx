@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { useAuth } from "../Context/AuthContext";
 import { Bell, ArrowLeft, Trash2 } from "lucide-react";
+import { Avatar } from "../_component_/Avatar";
 
 export const Notifications = () => {
   const { user } = useAuth();
@@ -24,6 +25,7 @@ export const Notifications = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
+  const [senderProfiles, setSenderProfiles] = useState({}); // senderId -> { photoURL }
 
   /* ---------------- SWIPE STATE ---------------- */
   const [swipeId, setSwipeId] = useState(null);
@@ -78,6 +80,33 @@ export const Notifications = () => {
       setNotifications(notifs);
       setUnreadCount(notifs.filter((n) => !n.read).length);
       setLoading(false);
+
+      // Fetch profile photos for all senders we haven't loaded yet
+      const senderIds = [...new Set(notifs.map((n) => n.senderId).filter(Boolean))];
+      setSenderProfiles((prev) => {
+        const missing = senderIds.filter((id) => !prev[id]);
+        if (missing.length === 0) return prev;
+        Promise.all(
+          missing.map((id) =>
+            getDocs(query(collection(db, "users"), where("uid", "==", id))).then(
+              (snap) => {
+                if (!snap.empty) return { id, data: snap.docs[0].data() };
+                // Fallback: try direct doc lookup
+                return import("firebase/firestore").then(({ getDoc, doc: fdoc }) =>
+                  getDoc(fdoc(db, "users", id)).then((d) => ({ id, data: d.data() }))
+                );
+              }
+            )
+          )
+        ).then((results) => {
+          const patch = {};
+          results.forEach(({ id, data }) => {
+            patch[id] = { photoURL: data?.photoURL || "" };
+          });
+          setSenderProfiles((p) => ({ ...p, ...patch }));
+        });
+        return prev;
+      });
 
       await markAllAsRead(notifs);
     });
@@ -164,9 +193,8 @@ export const Notifications = () => {
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
           >
             <Trash2
-              className={`w-5 h-5 ${
-                clearing ? "animate-pulse text-gray-400" : ""
-              }`}
+              className={`w-5 h-5 ${clearing ? "animate-pulse text-gray-400" : ""
+                }`}
             />
           </button>
         </div>
@@ -213,9 +241,12 @@ export const Notifications = () => {
                   `}
                 >
                   <div className="flex gap-3">
-                    <div className="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-bold">
-                      {notif.senderName?.[0] || "?"}
-                    </div>
+                    <Avatar
+                      src={senderProfiles[notif.senderId]?.photoURL}
+                      name={notif.senderName || notif.senderEmail}
+                      size="w-10 h-10"
+                      textSize="text-base"
+                    />
 
                     <div className="flex-1">
                       <div className="flex justify-between mb-1">

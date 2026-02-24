@@ -16,6 +16,7 @@ import { CreatePost } from "./pages/CreatePost";
 import { Notifications } from "./pages/Notifications";
 import { ThemeProvider } from "./Context/ThemeContext";
 import { useAuth } from "./Context/AuthContext";
+import { ProfileCompletionModal } from "./_component_/ProfileCompletionModal";
 
 // Component to protect routes that require authentication
 const ProtectedRoute = ({ children }) => {
@@ -29,6 +30,13 @@ const PublicRoute = ({ children }) => {
   const { user } = useAuth();
   if (user) return <Navigate to="/" />;
   return children;
+};
+
+// Global profile completion modal gate
+const ProfileCompletionGate = () => {
+  const { user, showProfileCompletion, setShowProfileCompletion } = useAuth();
+  if (!user || !showProfileCompletion) return null;
+  return <ProfileCompletionModal onClose={() => setShowProfileCompletion(false)} />;
 };
 
 const App = () => {
@@ -83,6 +91,9 @@ const App = () => {
           {/* Catch-all redirect to Home */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
+
+        {/* Global profile-completion modal — renders on top of all routes */}
+        <ProfileCompletionGate />
       </Router>
     </ThemeProvider>
   );

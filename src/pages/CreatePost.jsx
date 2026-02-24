@@ -1,16 +1,25 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../../firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { useAuth } from "../Context/AuthContext";
 import { toast } from "react-hot-toast";
 import { ArrowLeft, Image as ImageIcon } from "lucide-react";
+import { Avatar } from "../_component_/Avatar";
 
 export const CreatePost = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [content, setContent] = useState("");
     const [loading, setLoading] = useState(false);
+    const [userProfile, setUserProfile] = useState(null);
+
+    useEffect(() => {
+        if (!user) return;
+        getDoc(doc(db, "users", user.uid)).then((d) => {
+            if (d.exists()) setUserProfile(d.data());
+        });
+    }, [user]);
 
     const handlePostSubmit = async (e) => {
         e.preventDefault();
@@ -56,9 +65,12 @@ export const CreatePost = () => {
 
             <div className="p-4">
                 <div className="flex gap-3">
-                    <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400 font-bold shrink-0 transition-colors">
-                        {user?.email?.charAt(0).toUpperCase()}
-                    </div>
+                    <Avatar
+                        src={userProfile?.photoURL}
+                        name={user?.displayName || user?.email}
+                        size="w-10 h-10"
+                        textSize="text-base"
+                    />
                     <textarea
                         autoFocus
                         placeholder="What's happening?"

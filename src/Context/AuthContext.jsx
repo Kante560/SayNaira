@@ -8,26 +8,31 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import { auth, db } from "../../firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  // true  → show the profile-completion modal
+  const [showProfileCompletion, setShowProfileCompletion] = useState(false);
 
   const signup = async (email, password, name) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-    
-    // Create user document in Firestore
-    await setDoc(doc(db, "users", user.uid), {
-      email: user.email,
-      uid: user.uid,
+    const newUser = userCredential.user;
+
+    // Create base user document (no photoURL yet)
+    await setDoc(doc(db, "users", newUser.uid), {
+      email: newUser.email,
+      uid: newUser.uid,
       name: name || "",
+      photoURL: "",
       createdAt: serverTimestamp(),
     });
-    
+
+    // Always show the modal for brand-new signups
+    setShowProfileCompletion(true);
     return userCredential;
   };
 
@@ -38,17 +43,26 @@ export const AuthProvider = ({ children }) => {
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     const userCredential = await signInWithPopup(auth, provider);
-    const user = userCredential.user;
-    
-    // Create user document in Firestore if it doesn't exist
-    await setDoc(doc(db, "users", user.uid), {
-      email: user.email,
-      uid: user.uid,
-      name: user.displayName || "",
-      photoURL: user.photoURL || "",
-      createdAt: serverTimestamp(),
-    }, { merge: true });
-    
+    const googleUser = userCredential.user;
+
+    // Create user document if it doesn't exist
+    await setDoc(
+      doc(db, "users", googleUser.uid),
+      {
+        email: googleUser.email,
+        uid: googleUser.uid,
+        name: googleUser.displayName || "",
+        photoURL: googleUser.photoURL || "",
+        createdAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    // If Google already provided a photo we don't nag them
+    if (!googleUser.photoURL) {
+      setShowProfileCompletion(true);
+    }
+
     return userCredential;
   };
 
@@ -56,20 +70,19 @@ export const AuthProvider = ({ children }) => {
     if (user) {
       await setDoc(doc(db, "status", user.uid), { state: "offline" }, { merge: true });
     }
+    setShowProfileCompletion(false);
     return signOut(auth);
   };
 
   const setupPresenceTracking = async (currentUser) => {
     const userStatusRef = doc(db, "status", currentUser.uid);
 
-    // Mark online immediately
     await setDoc(
       userStatusRef,
       { state: "online", email: currentUser.email },
       { merge: true }
     );
 
-    // Handle when user closes tab or refreshes
     const handleUnload = async () => {
       await setDoc(userStatusRef, { state: "offline" }, { merge: true });
     };
@@ -87,20 +100,43 @@ export const AuthProvider = ({ children }) => {
       setUser(currentUser);
       setLoading(false);
 
-      let cleanup;
-
       if (currentUser) {
-        cleanup = await setupPresenceTracking(currentUser);
-      }
+        setupPresenceTracking(currentUser);
 
-      return cleanup;
+        // Check whether this user already has a profile photo in Firestore
+        try {
+          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            // Show modal if no photoURL is saved yet
+            if (!data.photoURL) {
+              setShowProfileCompletion(true);
+            }
+          } else {
+            // No Firestore doc at all — definitely show the modal
+            setShowProfileCompletion(true);
+          }
+        } catch (err) {
+          console.error("Error checking user profile:", err);
+        }
+      }
     });
 
     return () => unsubscribe();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, loginWithGoogle, signup, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        loginWithGoogle,
+        signup,
+        logout,
+        showProfileCompletion,
+        setShowProfileCompletion,
+      }}
+    >
       {!loading && children}
     </AuthContext.Provider>
   );

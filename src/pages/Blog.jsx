@@ -17,7 +17,9 @@ import {
 import { useAuth } from "../Context/AuthContext";
 import { Nav } from "../Home/Nav";
 import { Link } from "react-router-dom";
-import { MessageCircle, Heart, Share2, MoreHorizontal, Send, Image as ImageIcon, Copy } from "lucide-react";
+import { MessageCircle, Heart, Share2, Send, Image as ImageIcon, Copy, X } from "lucide-react";
+import { useRef } from "react";
+import { Avatar } from "../_component_/Avatar";
 
 export const Blog = () => {
   const { user } = useAuth();
@@ -32,6 +34,14 @@ export const Blog = () => {
   const [commentInputs, setCommentInputs] = useState({});
   const [showComments, setShowComments] = useState({});
   const [showShareOptions, setShowShareOptions] = useState({});
+  const [postImage, setPostImage] = useState(null);         // Cloudinary URL after upload
+  const [imagePreview, setImagePreview] = useState(null);   // Local blob preview
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedImage, setSelectedImage] = useState(null); // Lightbox
+  const imageInputRef = useRef(null);
+  const [authorProfiles, setAuthorProfiles] = useState({}); // uid -> { photoURL }
+  const [currentUserProfile, setCurrentUserProfile] = useState(null);
 
   const fetchPosts = async () => {
     setLoading(true);
@@ -49,13 +59,34 @@ export const Blog = () => {
   useEffect(() => {
     setLoading(true);
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       const postsData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setPosts(postsData);
       setLoading(false);
+
+      // Fetch profiles for any new authors we haven't loaded yet
+      const uids = [...new Set(postsData.map((p) => p.authorId).filter(Boolean))];
+      setAuthorProfiles((prev) => {
+        const missing = uids.filter((u) => !prev[u]);
+        if (missing.length === 0) return prev;
+        Promise.all(
+          missing.map((uid) =>
+            import("firebase/firestore").then(({ getDoc, doc: fdoc }) =>
+              getDoc(fdoc(db, "users", uid)).then((d) => ({ uid, data: d.data() }))
+            )
+          )
+        ).then((results) => {
+          const patch = {};
+          results.forEach(({ uid, data }) => {
+            patch[uid] = { photoURL: data?.photoURL || "" };
+          });
+          setAuthorProfiles((p) => ({ ...p, ...patch }));
+        });
+        return prev;
+      });
     }, (error) => {
       console.error("Error fetching posts:", error);
       setLoading(false);
@@ -79,7 +110,7 @@ export const Blog = () => {
           ...commentData,
         });
       });
-      
+
       // Sort comments by timestamp for each post
       Object.keys(commentsData).forEach(postId => {
         commentsData[postId].sort((a, b) => {
@@ -88,7 +119,7 @@ export const Blog = () => {
           return timeA - timeB;
         });
       });
-      
+
       setComments(commentsData);
     });
     return unsubscribe;
@@ -106,6 +137,71 @@ export const Blog = () => {
     return () => unsubscribe();
   }, []);
 
+  // Fetch current user's profile for composer avatar
+  useEffect(() => {
+    if (!user) return;
+    import("firebase/firestore").then(({ getDoc, doc: fdoc }) =>
+      getDoc(fdoc(db, "users", user.uid)).then((d) => {
+        if (d.exists()) setCurrentUserProfile(d.data());
+      })
+    );
+  }, [user]);
+
+  // Handle image file selection (preview before upload)
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image must be less than 10MB");
+      return;
+    }
+
+    const localUrl = URL.createObjectURL(file);
+    setImagePreview(localUrl);
+    handleImageUpload(file);
+  };
+
+  // Upload image to Cloudinary
+  const handleImageUpload = async (file) => {
+    setIsUploadingImage(true);
+    setUploadProgress(0);
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "social_app_uploads");
+
+    try {
+      const res = await fetch(
+        "https://api.cloudinary.com/v1_1/dc5mukmoh/image/upload",
+        { method: "POST", body: formData }
+      );
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      setPostImage(data.secure_url);
+      setUploadProgress(100);
+      toast.success("Image ready!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to upload image");
+      cancelImageSelection();
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const cancelImageSelection = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(null);
+    setPostImage(null);
+    setUploadProgress(0);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  };
+
   // Click outside to close dropdowns
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -120,24 +216,30 @@ export const Blog = () => {
 
   const handlePostSubmit = async (e) => {
     e.preventDefault();
-    if (!content) {
-      toast.error("Post content is required");
+    if (!content && !postImage) {
+      toast.error("Please write something or add an image");
+      return;
+    }
+    if (isUploadingImage) {
+      toast.error("Please wait for image to finish uploading");
       return;
     }
 
     try {
       await addDoc(collection(db, "posts"), {
-        title: title || "Untitled", // Titles are optional in social feeds
+        title: title || "Untitled",
         content,
+        imageUrl: postImage || null,
         authorId: user.uid,
         authorEmail: user.email,
         authorName: user.displayName || user.email.split('@')[0],
         createdAt: serverTimestamp(),
-        likes: [], // Array of user IDs who liked the post
+        likes: [],
         comments: 0
       });
       setTitle("");
       setContent("");
+      cancelImageSelection();
       setShowForm(false);
       toast.success("Posted!");
     } catch (err) {
@@ -235,19 +337,19 @@ export const Blog = () => {
 
   // Handle WhatsApp share
   const handleWhatsAppShare = (post) => {
-    const postText = post.title && post.title !== "Untitled" 
+    const postText = post.title && post.title !== "Untitled"
       ? `${post.title}\n\n${post.content}`
       : post.content;
-    
+
     // Truncate very long posts for WhatsApp
     const maxLength = 1000;
-    const truncatedText = postText.length > maxLength 
+    const truncatedText = postText.length > maxLength
       ? postText.substring(0, maxLength) + "...\n\n[Read more on SayNaira App]"
       : postText;
-    
+
     const shareMessage = `📝 *${post.authorName || post.authorEmail.split('@')[0]} posted:*\n\n${truncatedText}\n\n🔗 *Shared from SayLess App*`;
     const shareUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
-    
+
     window.open(shareUrl, '_blank');
     toast.success("Opening WhatsApp to share post");
   };
@@ -255,7 +357,7 @@ export const Blog = () => {
   // Handle copy link
   const handleCopyLink = async (post) => {
     const postUrl = `${window.location.origin}/blog#${post.id}`;
-    
+
     try {
       await navigator.clipboard.writeText(postUrl);
       toast.success("Link copied to clipboard!");
@@ -281,9 +383,12 @@ export const Blog = () => {
         {user && (
           <div className="bg-white dark:bg-gray-800 p-4 sm:rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 transition-colors">
             <div className="flex gap-4">
-              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400 font-bold shrink-0">
-                {user.email.charAt(0).toUpperCase()}
-              </div>
+              <Avatar
+                src={currentUserProfile?.photoURL}
+                name={user.displayName || user.email}
+                size="w-10 h-10"
+                textSize="text-base"
+              />
               <div className="flex-1">
                 <textarea
                   placeholder="What's happening?"
@@ -291,13 +396,64 @@ export const Blog = () => {
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                 />
+
+                {/* Image Preview before upload */}
+                {imagePreview && (
+                  <div className="relative mx-3 mb-3 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full max-h-60 object-cover"
+                    />
+                    {/* Upload progress overlay */}
+                    {isUploadingImage && (
+                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2">
+                        <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-white text-xs font-medium">Uploading...</span>
+                        <div className="w-2/3 bg-white/30 rounded-full h-1.5">
+                          <div className="bg-white h-full rounded-full transition-all" style={{ width: `${uploadProgress}%` }}></div>
+                        </div>
+                      </div>
+                    )}
+                    {/* Cancel button */}
+                    {!isUploadingImage && (
+                      <button
+                        onClick={cancelImageSelection}
+                        className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full w-7 h-7 flex items-center justify-center transition"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                    {/* Ready badge */}
+                    {postImage && !isUploadingImage && (
+                      <span className="absolute bottom-2 left-2 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        ✓ Ready
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-50 dark:border-gray-700">
-                  {/* <button className="text-green-600 dark:text-green-400 p-2 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-full transition">
+                  {/* Hidden file input */}
+                  <input
+                    type="file"
+                    ref={imageInputRef}
+                    onChange={handleImageSelect}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => imageInputRef.current.click()}
+                    disabled={isUploadingImage}
+                    className="text-green-600 dark:text-green-400 p-2 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-full transition disabled:opacity-50"
+                    title="Add image"
+                  >
                     <ImageIcon size={20} />
-                  </button> */}
+                  </button>
                   <button
                     onClick={handlePostSubmit}
-                    disabled={!content.trim()}
+                    disabled={(!content.trim() && !postImage) || isUploadingImage}
                     className="bg-green-600 text-white px-6 py-2 rounded-full font-bold text-sm hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
                     Post
                   </button>
@@ -333,11 +489,12 @@ export const Blog = () => {
                 <div className="p-4 flex justify-between items-center">
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <div className="w-10 h-10 bg-gradient-to-tr from-yellow-400 to-purple-600 p-[2px] rounded-full">
-                        <div className="w-full h-full bg-white dark:bg-gray-800 rounded-full flex items-center justify-center font-bold text-gray-700 dark:text-gray-200 text-sm overflow-hidden">
-                          {post.authorEmail.charAt(0).toUpperCase()}
-                        </div>
-                      </div>
+                      <Avatar
+                        src={authorProfiles[post.authorId]?.photoURL}
+                        name={post.authorName || post.authorEmail}
+                        size="w-10 h-10"
+                        textSize="text-sm"
+                      />
                       <div className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white dark:border-gray-800 rounded-full ${onlineUsers[post.authorId] ? "bg-green-500" : "bg-red-500"}`}></div>
                     </div>
                     <div>
@@ -355,49 +512,59 @@ export const Blog = () => {
                 {/* Post Content */}
                 <div className="px-4 pb-2">
                   {post.title && post.title !== "Untitled" && <h3 className="font-bold mb-2 text-gray-900 dark:text-white">{post.title}</h3>}
-                  <p className="text-gray-800 dark:text-gray-200 text-[15px] whitespace-pre-wrap leading-relaxed">
-                    {post.content}
-                  </p>
+                  {post.content && (
+                    <p className="text-gray-800 dark:text-gray-200 text-[15px] whitespace-pre-wrap leading-relaxed mb-3">
+                      {post.content}
+                    </p>
+                  )}
+                  {/* Post Image */}
+                  {post.imageUrl && (
+                    <div className="rounded-xl overflow-hidden mt-1 mb-1 cursor-zoom-in" onClick={() => setSelectedImage(post.imageUrl)}>
+                      <img
+                        src={post.imageUrl}
+                        alt="Post image"
+                        className="w-full max-h-[400px] object-cover hover:opacity-95 transition"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Actions */}
                 <div className="px-4 py-3 flex items-center justify-between border-t border-gray-50 dark:border-gray-700 mt-2 transition-colors">
                   <div className="flex items-center gap-6">
-                    <button 
+                    <button
                       onClick={() => handleLike(post.id, post.likes || [])}
-                      className={`flex items-center gap-2 transition group ${
-                        (post.likes || []).includes(user?.uid) 
-                          ? "text-red-500 dark:text-red-400" 
-                          : "text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400"
-                      }`}
+                      className={`flex items-center gap-2 transition group ${(post.likes || []).includes(user?.uid)
+                        ? "text-red-500 dark:text-red-400"
+                        : "text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400"
+                        }`}
                     >
-                      <Heart 
-                        size={22} 
-                        className={`group-hover:scale-110 transition-transform ${
-                          (post.likes || []).includes(user?.uid) ? "fill-current" : ""
-                        }`} 
+                      <Heart
+                        size={22}
+                        className={`group-hover:scale-110 transition-transform ${(post.likes || []).includes(user?.uid) ? "fill-current" : ""
+                          }`}
                       />
                       <span className="text-sm font-medium">
                         {post.likes?.length || 0}
                       </span>
                     </button>
-                    <button 
+                    <button
                       onClick={() => toggleComments(post.id)}
                       className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition"
                     >
                       <MessageCircle size={22} />
                       <span className="text-sm font-medium">{comments[post.id]?.length || 0}</span>
                     </button>
-                    
+
                     {/* Share Button with Dropdown */}
                     <div className="relative share-dropdown">
-                      <button 
+                      <button
                         onClick={() => toggleShareOptions(post.id)}
                         className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-green-500 dark:hover:text-green-500 transition"
                       >
                         <Share2 size={22} />
                       </button>
-                      
+
                       {/* Share Options Dropdown */}
                       {showShareOptions[post.id] && (
                         <div className="absolute bottom-8 left-0 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 text-sm space-y-1 z-50 border border-gray-200 dark:border-gray-700 min-w-[150px]">
@@ -452,10 +619,13 @@ export const Blog = () => {
                     <div className="px-4 py-3 space-y-3 max-h-64 overflow-y-auto">
                       {comments[post.id]?.length > 0 ? (
                         comments[post.id].map((comment) => (
-                          <div key={comment.id} className="flex gap-3">
-                            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold shrink-0 text-sm">
-                              {comment.authorEmail.charAt(0).toUpperCase()}
-                            </div>
+                          <div className="flex gap-3">
+                            <Avatar
+                              src={authorProfiles[comment.authorId]?.photoURL}
+                              name={comment.authorName || comment.authorEmail}
+                              size="w-8 h-8"
+                              textSize="text-xs"
+                            />
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <p className="font-bold text-sm text-gray-900 dark:text-white">
@@ -482,9 +652,12 @@ export const Blog = () => {
                     {user && (
                       <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700">
                         <div className="flex gap-2">
-                          <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400 font-bold shrink-0 text-sm">
-                            {user.email.charAt(0).toUpperCase()}
-                          </div>
+                          <Avatar
+                            src={currentUserProfile?.photoURL}
+                            name={user.displayName || user.email}
+                            size="w-8 h-8"
+                            textSize="text-xs"
+                          />
                           <div className="flex-1 flex gap-2">
                             <input
                               type="text"
@@ -520,6 +693,26 @@ export const Blog = () => {
         </div>
 
       </div>
+
+      {/* Full-screen Image Lightbox */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <button
+            className="absolute top-5 right-5 text-white bg-white/10 hover:bg-white/25 backdrop-blur-sm rounded-full w-10 h-10 flex items-center justify-center transition"
+            onClick={() => setSelectedImage(null)}
+          >
+            <X size={20} />
+          </button>
+          <img
+            src={selectedImage}
+            className="max-h-[90vh] max-w-[90vw] rounded-xl shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 };

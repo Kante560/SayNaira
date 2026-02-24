@@ -16,7 +16,8 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { useAuth } from "../Context/AuthContext";
-import { ArrowLeft, Send, Check, Smile, MoreVertical, Edit, X, Trash2, Mic, Square } from "lucide-react";
+import { ArrowLeft, Send, Check, Smile, Mic, Square, Trash2, Edit, MoreVertical, Paperclip, FileText, X } from "lucide-react";
+import { Avatar } from "./Avatar";
 import { StickerPicker } from "./StickerPicker";
 
 export const Chat = () => {
@@ -29,12 +30,15 @@ export const Chat = () => {
   const [isOnline, setIsOnline] = useState(false);
   const [isStickerPickerOpen, setIsStickerPickerOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [editingMessage, setEditingMessage] = useState(null);
   const [editText, setEditText] = useState("");
   const [showMenu, setShowMenu] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingIntervalRef = useRef(null);
@@ -44,6 +48,9 @@ export const Chat = () => {
   const playbackIntervalRef = useRef(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState(null);
+  const [fileToUpload, setFileToUpload] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   const chatId = [user.uid, recipientId].sort().join("_");
 
@@ -80,7 +87,7 @@ export const Chat = () => {
     currentAudioRef.current = audio;
     setPlayingMessageId(messageId);
     setCurrentPlaybackTime(0);
-    
+
     audio.play().catch((error) => {
       console.error("Audio playback failed:", error);
     });
@@ -174,6 +181,12 @@ export const Chat = () => {
 
   const sendMessage = async (e) => {
     e.preventDefault();
+
+    if (fileToUpload) {
+      await uploadAndSendFile(message.trim());
+      return;
+    }
+
     if (!message.trim() || isSending) return;
 
     // Cancel any ongoing edit when sending a new message
@@ -192,6 +205,7 @@ export const Chat = () => {
       );
 
       await addDoc(collection(db, "chats", chatId, "messages"), {
+        type: "text",
         text: messageText,
         senderId: user.uid,
         receiverId: recipientId,
@@ -259,6 +273,103 @@ export const Chat = () => {
     }
   };
 
+  const handleFileClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File size must be less than 10MB");
+      return;
+    }
+
+    setFileToUpload(file);
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    } else {
+      setPreviewUrl(null);
+    }
+  };
+
+  const cancelFileSelection = () => {
+    setFileToUpload(null);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const uploadAndSendFile = async (caption = "") => {
+    if (!fileToUpload) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    const formData = new FormData();
+    formData.append("file", fileToUpload);
+    formData.append("upload_preset", "social_app_uploads");
+
+    try {
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/dc5mukmoh/auto/upload`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) throw new Error("Upload failed");
+
+      const data = await response.json();
+      const isImage = fileToUpload.type.startsWith("image/");
+
+      await setDoc(
+        doc(db, "chats", chatId),
+        { lastUpdated: serverTimestamp() },
+        { merge: true }
+      );
+
+      await addDoc(collection(db, "chats", chatId, "messages"), {
+        type: isImage ? "image" : "file",
+        fileUrl: data.secure_url,
+        fileName: fileToUpload.name,
+        fileType: fileToUpload.type,
+        senderId: user.uid,
+        receiverId: recipientId,
+        timestamp: serverTimestamp(),
+        read: false,
+        text: caption,
+      });
+
+      await addDoc(collection(db, "notifications"), {
+        userId: recipientId,
+        type: "message",
+        senderId: user.uid,
+        senderEmail: user.email,
+        senderName: user.displayName || user.email,
+        message: isImage ? `🖼️ Image ${caption ? ': ' + caption : ''}` : `📁 File: ${fileToUpload.name}`,
+        chatId: chatId,
+        read: false,
+        timestamp: serverTimestamp(),
+      });
+
+      toast.success("File sent successfully!");
+      setMessage(""); // Clear caption
+    } catch (err) {
+      console.error("File upload error:", err);
+      toast.error("Failed to upload file");
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+      cancelFileSelection();
+    }
+  };
+
   // Edit message functions
   const handleEditClick = (msg) => {
     setEditingMessage(msg.id);
@@ -299,19 +410,19 @@ export const Chat = () => {
 
   const confirmDelete = async () => {
     if (!messageToDelete) return;
-    
+
     console.log("Attempting to delete message from Firestore...");
     console.log("Chat ID:", chatId);
     console.log("Message ID:", messageToDelete);
-    
+
     // Find the message to determine its type
     const messageToDeleteData = messages.find(msg => msg.id === messageToDelete);
     console.log("Message to delete:", messageToDeleteData);
-    
+
     const updateData = {
       deletedForEveryone: true,
     };
-    
+
     // Set appropriate deleted message based on type
     if (messageToDeleteData?.type === "voice") {
       updateData.audioData = null;
@@ -321,25 +432,25 @@ export const Chat = () => {
       updateData.text = "This message was deleted";
       console.log("Deleting text message");
     }
-    
+
     console.log("Update data:", updateData);
-    
+
     try {
       await updateDoc(doc(db, "chats", chatId, "messages", messageToDelete), updateData);
-      
+
       console.log("Message successfully deleted");
-      
+
       // Update local state immediately to reflect deletion
-      setMessages(prevMessages => 
-        prevMessages.map(msg => 
-          msg.id === messageToDelete 
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
+          msg.id === messageToDelete
             ? { ...msg, ...updateData }
             : msg
         )
       );
-      
+
       console.log("Local state updated");
-      
+
       // Show success toast
       toast.success("Message deleted successfully");
     } catch (err) {
@@ -410,7 +521,7 @@ export const Chat = () => {
 
       // Store the final recording time before resetting
       const finalRecordingTime = recordingTime;
-      
+
       // Send voice note with the captured duration
       setTimeout(() => {
         sendVoiceNoteWithDuration(finalRecordingTime);
@@ -538,9 +649,12 @@ export const Chat = () => {
 
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="w-10 h-10 bg-gradient-to-tr from-green-400 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold">
-                {recipientInfo?.email?.charAt(0).toUpperCase() || "?"}
-              </div>
+              <Avatar
+                src={recipientInfo?.photoURL}
+                name={recipientInfo?.name || recipientInfo?.email}
+                size="w-10 h-10"
+                textSize="text-sm"
+              />
               <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 border-2 border-white dark:border-gray-800 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`}></div>
             </div>
             <div>
@@ -637,10 +751,10 @@ export const Chat = () => {
                             <div className="flex-1">
                               <p className="font-medium text-gray-900 dark:text-white text-sm">Voice Note</p>
                               <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {playingMessageId === msg.id 
+                                {playingMessageId === msg.id
                                   ? formatRecordingTime(currentPlaybackTime)
-                                  : msg.duration 
-                                    ? formatRecordingTime(msg.duration) 
+                                  : msg.duration
+                                    ? formatRecordingTime(msg.duration)
                                     : "0:00"
                                 }
                               </p>
@@ -670,6 +784,42 @@ export const Chat = () => {
                           </div>
                         </div>
                       )
+                    ) : msg.type === "image" ? (
+                      <div className="flex flex-col gap-1">
+                        <img
+                          src={msg.fileUrl}
+                          alt={msg.fileName}
+                          className="max-w-full rounded-lg cursor-zoom-in hover:opacity-95 transition"
+                          onClick={() => setSelectedImage(msg.fileUrl)}
+                        />
+                        {msg.text && <p className="text-[15px] mt-2 mb-1">{msg.text}</p>}
+                        <div className="text-[10px] mt-1 flex items-center justify-end gap-1 text-gray-400 dark:text-gray-500">
+                          <span>{formatTime(msg.timestamp)}</span>
+                          {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500" />}
+                        </div>
+                      </div>
+                    ) : msg.type === "file" ? (
+                      <div className="flex flex-col gap-1">
+                        <a
+                          href={msg.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+                        >
+                          <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded flex items-center justify-center">
+                            <FileText className="text-blue-600 dark:text-blue-400" size={20} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{msg.fileName}</p>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase">{msg.fileType?.split('/')[1] || 'FILE'}</p>
+                          </div>
+                        </a>
+                        {msg.text && <p className="text-[15px] mt-2 mb-1">{msg.text}</p>}
+                        <div className="text-[10px] mt-1 flex items-center justify-end gap-1 text-gray-400 dark:text-gray-500">
+                          <span>{formatTime(msg.timestamp)}</span>
+                          {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500" />}
+                        </div>
+                      </div>
                     ) : (
                       <>
                         <p className="text-[15px]">{msg.text}</p>
@@ -740,16 +890,87 @@ export const Chat = () => {
               </button>
             </div>
           )}
+          {/* Upload progress indicator */}
+          {isUploading && (
+            <div className="absolute -top-16 left-4 right-4 bg-white dark:bg-gray-800 rounded-lg p-3 shadow-lg border border-gray-100 dark:border-gray-700 flex flex-col gap-2 z-50">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sending file...</span>
+                <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="bg-green-600 h-full transition-all duration-300"
+                  style={{ width: `${uploadProgress || 10}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+
+          {/* File/Image PreviewCard */}
+          {fileToUpload && (
+            <div className="absolute -top-32 left-4 right-4 bg-white dark:bg-gray-800 rounded-2xl p-3 shadow-2xl border border-gray-100 dark:border-gray-700 flex flex-col gap-2 z-50 animate-in slide-in-from-bottom-4 transition-all overflow-hidden max-h-40">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-xs font-bold text-green-600 dark:text-green-500 uppercase tracking-wider">
+                  {previewUrl ? 'Image Preview' : 'File Selected'}
+                </span>
+                <button
+                  onClick={cancelFileSelection}
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition text-gray-500"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="flex gap-4 items-center">
+                {previewUrl ? (
+                  <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-100 dark:border-gray-700 bg-gray-50 flex-shrink-0">
+                    <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="w-16 h-16 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
+                    <FileText className="text-blue-600 dark:text-blue-400" size={24} />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate text-gray-900 dark:text-white">
+                    {fileToUpload.name}
+                  </p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                    {(fileToUpload.size / 1024 / 1024).toFixed(2)} MB • {fileToUpload.type.split('/')[1]?.toUpperCase() || 'FILE'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={sendMessage} className="flex gap-2 items-center bg-gray-100 dark:bg-gray-700 rounded-full px-4 py-2 transition-colors">
+            {/* Hidden File Input */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              className="hidden"
+              accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+            />
+
+            {/* File upload button */}
+            <button
+              type="button"
+              onClick={handleFileClick}
+              disabled={isSending || isRecording || isUploading}
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Paperclip size={20} />
+            </button>
+
             {/* Voice recording button */}
             <button
               type="button"
               onClick={isRecording ? stopRecording : startRecording}
-              disabled={isSending}
+              disabled={isSending || isUploading}
               className={`p-2 rounded-full flex items-center justify-center transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${isRecording
-                  ? 'bg-red-600 text-white hover:bg-red-700 animate-pulse'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400'
+                ? 'bg-red-600 text-white hover:bg-red-700 animate-pulse'
+                : 'text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400'
                 }`}
             >
               {isRecording ? <Square size={20} /> : <Mic size={20} />}
@@ -759,7 +980,7 @@ export const Chat = () => {
             <button
               type="button"
               onClick={() => setIsStickerPickerOpen(!isStickerPickerOpen)}
-              disabled={isSending || isRecording}
+              disabled={isSending || isRecording || isUploading}
               className="p-2 text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Smile size={20} />
@@ -775,12 +996,12 @@ export const Chat = () => {
                 }
               }}
               placeholder="Message..."
-              disabled={isSending || isRecording}
+              disabled={isSending || isRecording || isUploading}
               className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-sm py-2 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white disabled:opacity-50"
             />
             <button
               type="submit"
-              disabled={!message.trim() || isSending || isRecording}
+              disabled={(!message.trim() && !fileToUpload) || isSending || isRecording || isUploading}
               className="p-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
             >
               <Send size={16} />
@@ -823,6 +1044,26 @@ export const Chat = () => {
           )}
         </div>
       </div>
+
+      {/* Full-screen Image Preview Modal */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[100] p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <button
+            className="absolute top-5 right-5 text-white bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full w-10 h-10 flex items-center justify-center transition text-xl"
+            onClick={() => setSelectedImage(null)}
+          >
+            <X size={20} />
+          </button>
+          <img
+            src={selectedImage}
+            className="max-h-[90vh] max-w-[90vw] rounded-xl shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 };
