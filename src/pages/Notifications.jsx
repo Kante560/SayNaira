@@ -16,6 +16,7 @@ import {
 import { useAuth } from "../Context/AuthContext";
 import { Bell, ArrowLeft, Trash2 } from "lucide-react";
 import { Avatar } from "../_component_/Avatar";
+import { Loader } from "../_component_/Loader";
 
 export const Notifications = () => {
   const { user } = useAuth();
@@ -203,7 +204,9 @@ export const Notifications = () => {
       {/* CONTENT */}
       <div className="pt-16 px-4 pb-20 max-w-2xl mx-auto">
         {loading ? (
-          <div className="text-center py-20">Loading...</div>
+          <div className="py-20">
+            <Loader label="Loading notifications..." />
+          </div>
         ) : notifications.length ? (
           <div className="bg-white dark:bg-gray-800 rounded-xl divide-y">
             {notifications.map((notif) => (

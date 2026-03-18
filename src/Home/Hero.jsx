@@ -1,7 +1,7 @@
 import React from "react";
-import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Shield, Zap, Globe, MessageCircle, Video, DollarSign, Users, Eye, Lock, CheckCircle } from "lucide-react";
+import { MessageCircle, Video, Users, Eye, Lock, ArrowRight, Zap, Shield, Globe, CheckCircle } from "lucide-react";
+import { motion } from "framer-motion";
 
 export const Hero = () => {
   return (
@@ -108,9 +108,7 @@ export const Hero = () => {
                 {/* Chat list */}
                 <div className="border-r border-gray-800 p-4">
                   <div className="flex items-center gap-2 mb-4">
-                    <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center font-bold">
-                      SL
-                    </div>
+                    <img src="/SayLess.png" alt="SayLess Logo" className="w-auto h-25 rounded-lg" />
                     <h3 className="font-bold text-green-400">My Chats</h3>
                   </div>
                   <div className="space-y-2">

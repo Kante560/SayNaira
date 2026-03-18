@@ -12,11 +12,13 @@ import { useAuth } from "../Context/AuthContext";
 import { Nav } from "../Home/Nav";
 import { MessageCircle, Search, Plus } from "lucide-react";
 import { Avatar } from "../_component_/Avatar";
+import { Loader } from "../_component_/Loader";
 
 export const ChatList = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [conversations, setConversations] = useState([]);
+  const [loadingChats, setLoadingChats] = useState(true);
   const [users, setUsers] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [onlineUsers, setOnlineUsers] = useState({});
@@ -75,6 +77,7 @@ export const ChatList = () => {
 
     const chatsRef = collection(db, "chats");
     const unsubscribe = onSnapshot(chatsRef, async (snapshot) => {
+      setLoadingChats(true);
       const chatsData = [];
 
       for (const chatDoc of snapshot.docs) {
@@ -131,6 +134,7 @@ export const ChatList = () => {
       });
 
       setConversations(chatsData);
+      setLoadingChats(false);
     });
 
     return () => unsubscribe();
@@ -142,16 +146,16 @@ export const ChatList = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20 transition-colors duration-300">
+    <div className="min-h-screen bg-black pb-20">
       <Nav />
       <div className="max-w-3xl mx-auto pt-20 px-4">
 
         {/* Header Title */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Chats</h1>
+          <h1 className="text-2xl font-bold text-white">Chats</h1>
           <button
             onClick={() => setShowUserSearch(true)}
-            className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 transition"
+            className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 hover:bg-green-500/30 transition"
           >
             <Plus size={24} />
           </button>
@@ -159,13 +163,13 @@ export const ChatList = () => {
 
         {/* Search */}
         <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/40" />
           <input
             type="text"
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white dark:bg-gray-800 pl-10 pr-4 py-3 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-green-500 outline-none placeholder-gray-400 dark:placeholder-gray-500 font-medium text-gray-900 dark:text-gray-100 transition-colors"
+            className="w-full bg-black/30 pl-10 pr-4 py-3 rounded-xl border border-white/10 backdrop-blur-xl focus:ring-2 focus:ring-green-500/70 focus:border-transparent outline-none placeholder:text-white/40 font-medium text-white transition shadow-inner shadow-black/20"
           />
         </div>
 
@@ -205,13 +209,13 @@ export const ChatList = () => {
         </div> */}
 
         {/* Conversations List */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors">
+        <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden">
           {filteredConversations.length > 0 ? (
             filteredConversations.map((conv) => (
               <div
                 key={conv.chatId}
                 onClick={() => navigate(`/chat/${conv.otherUserId}`)}
-                className="flex items-center gap-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition border-b border-gray-50 dark:border-gray-700 last:border-none"
+                className="flex items-center gap-4 p-4 hover:bg-white/5 cursor-pointer transition border-b border-white/10 last:border-none"
               >
                 {/* Avatar */}
                 <div className="relative flex-shrink-0">
@@ -221,23 +225,23 @@ export const ChatList = () => {
                     size="w-14 h-14"
                     textSize="text-xl"
                   />
-                  <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-white dark:border-gray-800 rounded-full ${onlineUsers[conv.otherUserId] ? "bg-green-500" : "bg-red-500"}`}></div>
+                  <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-black/60 rounded-full ${onlineUsers[conv.otherUserId] ? "bg-green-500" : "bg-red-500"}`}></div>
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline mb-1">
-                    <h4 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-[15px]">
+                    <h4 className="font-semibold text-white truncate text-[15px]">
                       {conv.otherUserName || conv.otherUserEmail}
                     </h4>
                     {conv.timestamp && (
-                      <span className={`text-xs ${conv.unreadCount > 0 ? "text-green-600 dark:text-green-400 font-bold" : "text-gray-400 dark:text-gray-500"}`}>
+                      <span className={`text-xs ${conv.unreadCount > 0 ? "text-green-400 font-bold" : "text-white/50"}`}>
                         {new Date(conv.timestamp.toMillis()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     )}
                   </div>
                   <div className="flex justify-between items-center">
-                    <p className={`text-sm truncate pr-2 ${conv.unreadCount > 0 ? "text-gray-900 dark:text-white font-bold" : "text-gray-500 dark:text-gray-400"}`}>
+                    <p className={`text-sm truncate pr-2 ${conv.unreadCount > 0 ? "text-white font-bold" : "text-white/60"}`}>
                       {conv.lastMessage}
                     </p>
                     {conv.unreadCount > 0 && (
@@ -249,13 +253,22 @@ export const ChatList = () => {
                 </div>
               </div>
             ))
+          ) : loadingChats ? (
+            <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+              <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 backdrop-blur-xl flex items-center justify-center mb-4">
+                <Loader size="sm" showLabel={false} />
+              </div>
+              <p className="text-sm font-medium text-white/80">
+                Loading your chats...
+              </p>
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-              <div className="w-20 h-20 bg-gray-50 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4 transition-colors">
-                <MessageCircle className="w-8 h-8 text-gray-300 dark:text-gray-500" />
+              <div className="w-20 h-20 bg-white/5 backdrop-blur-xl rounded-full flex items-center justify-center mb-4">
+                <MessageCircle className="w-8 h-8 text-white/40" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No messages yet</h3>
-              <p className="text-gray-500 dark:text-gray-400 max-w-xs mb-6">Connect with people on the feed to start a conversation.</p>
+              <h3 className="text-lg font-semibold text-white mb-2">No messages yet</h3>
+              <p className="text-white/60 max-w-xs mb-6">Connect with people on the feed to start a conversation.</p>
               <button
                 onClick={() => navigate('/blog')}
                 className="px-6 py-3 bg-green-600 text-white rounded-full font-semibold hover:bg-green-700 transition"
@@ -269,33 +282,33 @@ export const ChatList = () => {
 
       {/* User Search Modal */}
       {showUserSearch && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-center pt-20">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-md mx-4 rounded-2xl shadow-xl max-h-[80vh] overflow-hidden">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-20">
+          <div className="bg-black/90 backdrop-blur-xl w-full max-w-md mx-4 rounded-2xl border border-white/10 max-h-[80vh] overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Search Users</h2>
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
+              <h2 className="text-lg font-semibold text-white">Search Users</h2>
               <button
                 onClick={() => {
                   setShowUserSearch(false);
                   setUserSearchQuery("");
                   setFilteredUsers([]);
                 }}
-                className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+                className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition"
               >
-                <Plus size={18} className="rotate-45 text-gray-500 dark:text-gray-400" />
+                <Plus size={18} className="rotate-45 text-white/60" />
               </button>
             </div>
 
             {/* Search Input */}
             <div className="p-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/40" />
                 <input
                   type="text"
                   placeholder="Search by name or email..."
                   value={userSearchQuery}
                   onChange={(e) => setUserSearchQuery(e.target.value)}
-                  className="w-full bg-gray-50 dark:bg-gray-700 pl-10 pr-4 py-3 rounded-xl border-none focus:ring-2 focus:ring-green-500 outline-none placeholder-gray-400 dark:placeholder-gray-500 font-medium text-gray-900 dark:text-gray-100 transition-colors"
+                  className="w-full bg-black/30 pl-10 pr-4 py-3 rounded-xl border border-white/10 backdrop-blur-xl focus:ring-2 focus:ring-green-500/70 focus:border-transparent outline-none placeholder:text-white/40 font-medium text-white transition shadow-inner shadow-black/20"
                   autoFocus
                 />
               </div>
@@ -316,11 +329,11 @@ export const ChatList = () => {
                           setUserSearchQuery("");
                           setFilteredUsers([]);
                         }}
-                        className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl cursor-pointer transition"
+                        className="flex items-center gap-3 p-3 hover:bg-white/10 rounded-xl cursor-pointer transition"
                       >
                         {/* Avatar */}
                         <div className="relative flex-shrink-0">
-                          <div className={`p-[2px] rounded-full ${isOnline ? "bg-gradient-to-tr from-green-400 to-emerald-600" : "bg-gray-300 dark:bg-gray-600"}`}>
+                          <div className={`p-[2px] rounded-full ${isOnline ? "bg-gradient-to-tr from-green-400 to-emerald-600" : "bg-white/20"}`}>
                             <Avatar
                               src={user.photoURL}
                               name={user.name || user.displayName || user.email}
@@ -328,23 +341,23 @@ export const ChatList = () => {
                               textSize="text-sm"
                             />
                           </div>
-                          <div className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white dark:border-gray-800 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`}></div>
+                          <div className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-black/60 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`}></div>
                         </div>
 
                         {/* User Info */}
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-gray-900 dark:text-white truncate">
+                          <h4 className="font-semibold text-white truncate">
                             {user.name || user.displayName || "User"}
                           </h4>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                          <p className="text-sm text-white/60 truncate">
                             {user.email}
                           </p>
                         </div>
 
                         {/* Online Status */}
                         <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${isOnline ? "bg-green-500" : "bg-gray-400"}`}></div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                          <div className={`w-2 h-2 rounded-full ${isOnline ? "bg-green-500" : "bg-white/40"}`}></div>
+                          <span className="text-xs text-white/60">
                             {isOnline ? "Online" : "Offline"}
                           </span>
                         </div>
@@ -354,19 +367,19 @@ export const ChatList = () => {
                 </div>
               ) : userSearchQuery.trim() ? (
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                  <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
-                    <Search className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                  <div className="w-16 h-16 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center mb-4">
+                    <Search className="w-8 h-8 text-white/40" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No users found</h3>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">Try searching with different keywords</p>
+                  <h3 className="text-lg font-semibold text-white mb-2">No users found</h3>
+                  <p className="text-white/60 text-sm">Try searching with different keywords</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                  <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
-                    <Search className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                  <div className="w-16 h-16 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center mb-4">
+                    <Search className="w-8 h-8 text-white/40" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Search for users</h3>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">Type to search by name or email</p>
+                  <h3 className="text-lg font-semibold text-white mb-2">Search for users</h3>
+                  <p className="text-white/60 text-sm">Type to search by name or email</p>
                 </div>
               )}
             </div>

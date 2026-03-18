@@ -54,6 +54,7 @@ const App = () => {
               boxShadow: "0 10px 25px rgba(0,0,0,0.35)",
               borderRadius: "12px",
               padding: "12px 14px",
+              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif",
             },
             success: {
               iconTheme: { primary: "#10B981", secondary: "#111827" },

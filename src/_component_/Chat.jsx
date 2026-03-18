@@ -19,6 +19,7 @@ import { useAuth } from "../Context/AuthContext";
 import { ArrowLeft, Send, Check, Smile, Mic, Square, Trash2, Edit, MoreVertical, Paperclip, FileText, X } from "lucide-react";
 import { Avatar } from "./Avatar";
 import { StickerPicker } from "./StickerPicker";
+import { Loader } from "./Loader";
 
 export const Chat = () => {
   const { recipientId } = useParams();
@@ -26,6 +27,7 @@ export const Chat = () => {
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
+  const [isChatLoading, setIsChatLoading] = useState(true);
   const [recipientInfo, setRecipientInfo] = useState(null);
   const [isOnline, setIsOnline] = useState(false);
   const [isStickerPickerOpen, setIsStickerPickerOpen] = useState(false);
@@ -149,6 +151,7 @@ export const Chat = () => {
         ...doc.data(),
       }));
       setMessages(messagesData);
+      setIsChatLoading(false);
 
       snapshot.docs.forEach(async (msgDoc) => {
         const msgData = msgDoc.data();
@@ -635,36 +638,59 @@ export const Chat = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+    <div className="min-h-screen bg-black text-white">
       <Nav />
 
-      {/* Chat Container - Full height minus Nav */}
-      <div className="flex-1 flex flex-col pt-0 md:pt-16 max-w-4xl mx-auto w-full overflow-hidden">
+      <main className="relative pt-16 min-h-screen overflow-hidden">
+        {/* Underlay image + overlays (match auth pages) */}
+        <div className="pointer-events-none absolute inset-0">
+          <div
+            className="absolute inset-0 bg-center bg-cover opacity-30 saturate-125"
+            style={{ backgroundImage: "url(/sideimg.jpg)" }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-black via-black/90 to-black/70" />
+          <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_70%_40%,rgba(34,197,94,0.18),transparent_60%)]" />
+        </div>
 
-        {/* Chat Header - Sticky at top */}
-        <div className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 border-b dark:border-gray-700 z-10 transition-colors">
-          <button onClick={() => navigate(-1)} className="text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 p-2 rounded-full transition">
+        <div className="relative mx-auto w-full max-w-4xl px-3 sm:px-4 py-4 sm:py-6">
+          <div className="flex flex-col min-h-[calc(100vh-64px-32px)] rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[0_20px_70px_-30px_rgba(0,0,0,0.85)] overflow-hidden">
+
+        {/* Chat Header */}
+        <div className="flex items-center gap-3 p-4 border-b border-white/10 bg-black/20 backdrop-blur-xl">
+          <button
+            onClick={() => navigate(-1)}
+            className="text-white/80 hover:text-white hover:bg-white/10 p-2 rounded-full transition"
+            aria-label="Go back"
+          >
             <ArrowLeft size={20} />
           </button>
 
-          <div className="flex items-center gap-3">
-            <div className="relative">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative flex-shrink-0">
               <Avatar
                 src={recipientInfo?.photoURL}
                 name={recipientInfo?.name || recipientInfo?.email}
                 size="w-10 h-10"
                 textSize="text-sm"
               />
-              <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 border-2 border-white dark:border-gray-800 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`}></div>
+              <div
+                className={`absolute bottom-0 right-0 w-2.5 h-2.5 border-2 border-black/60 rounded-full ${
+                  isOnline ? "bg-green-500" : "bg-red-500"
+                }`}
+              />
             </div>
-            <div>
-              <h3 className="font-bold text-gray-900 dark:text-white leading-tight">
-                {recipientInfo?.name || recipientInfo?.email?.split('@')[0]}
+            <div className="min-w-0">
+              <h3 className="font-bold text-white leading-tight truncate">
+                {recipientInfo?.name || recipientInfo?.email?.split("@")[0] || "Chat"}
               </h3>
-              <span className="text-xs text-gray-500 dark:text-gray-400 block">
+              <span className="text-xs text-white/60 block">
                 {isOnline ? "Active now" : "Offline"}
               </span>
             </div>
+          </div>
+
+          <div className="ml-auto text-xs text-white/50 hidden sm:block">
+            {isChatLoading ? "Connecting…" : "Connected"}
           </div>
         </div>
 
@@ -672,9 +698,14 @@ export const Chat = () => {
 
 
 
-        {/* Messages Area - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-10 bg-gray-50 dark:bg-gray-900 transition-colors no-scrollbar">
-          {messages.map((msg) => (
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-10 no-scrollbar">
+          {isChatLoading ? (
+            <div className="h-full min-h-[320px] flex items-center justify-center">
+              <Loader label="Loading chat..." />
+            </div>
+          ) : (
+            messages.map((msg) => (
             <div
               key={msg.id}
               className={`flex ${msg.senderId === user.uid ? "justify-end" : "justify-start"}`}
@@ -683,7 +714,9 @@ export const Chat = () => {
                 className={`${msg.type === "sticker" ? "max-w-[150px]" : "max-w-[75%] px-4 py-2"
                   } rounded-2xl ${msg.senderId === user.uid
                     ? msg.type === "sticker" ? "" : "bg-green-600 text-white rounded-tr-none"
-                    : msg.type === "sticker" ? "" : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none"
+                    : msg.type === "sticker"
+                      ? ""
+                      : "bg-white/10 text-white/90 shadow-sm border border-white/10 backdrop-blur-xl rounded-tl-none"
                   }`}
               >
                 {/* Edit mode */}
@@ -739,18 +772,18 @@ export const Chat = () => {
                       </div>
                     ) : msg.type === "voice" ? (
                       msg.deletedForEveryone ? (
-                        <div className="text-gray-500 dark:text-gray-400 italic text-sm">
+                        <div className="text-white/60 italic text-sm">
                           🎤 Voice note deleted
                         </div>
                       ) : (
                         <div>
-                          <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 flex items-center gap-3">
-                            <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
-                              <span className="text-red-600 dark:text-red-400 text-xl">🎤</span>
-                            </div>
-                            <div className="flex-1">
-                              <p className="font-medium text-gray-900 dark:text-white text-sm">Voice Note</p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                          <div className="rounded-2xl p-3.5 sm:p-4 flex items-center gap-3 border border-white/10 bg-black/25 backdrop-blur-xl">
+                            
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-white text-sm leading-tight">
+                                Voice note
+                              </p>
+                              <p className="text-xs text-white/60">
                                 {playingMessageId === msg.id
                                   ? formatRecordingTime(currentPlaybackTime)
                                   : msg.duration
@@ -761,10 +794,18 @@ export const Chat = () => {
                             </div>
                             <button
                               onClick={() => playVoiceNote(msg.audioData, msg.id)}
-                              className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center hover:bg-green-700 transition"
+                              className="w-9 h-9 bg-green-600 text-white rounded-full flex items-center justify-center hover:bg-green-700 transition shadow-[0_14px_40px_-20px_rgba(34,197,94,0.7)] active:scale-[0.99]"
+                              aria-label={playingMessageId === msg.id && !currentAudioRef.current?.paused ? "Pause voice note" : "Play voice note"}
                             >
-                              <span className="text-xs">
-                                {playingMessageId === msg.id && !currentAudioRef.current?.paused ? '❚❚' : '▶'}
+                              <span className="text-xs font-bold">
+                                {playingMessageId === msg.id && !currentAudioRef.current?.paused ? (
+                                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+                                    <rect x="6" y="4" width="4" height="16" rx="1" />
+                                    <rect x="14" y="4" width="4" height="16" rx="1" />
+                                  </svg>
+                                ) : (
+                                  '▶'
+                                )}
                               </span>
                             </button>
                           </div>
@@ -772,15 +813,15 @@ export const Chat = () => {
                           {msg.senderId === user.uid && (
                             <button
                               onClick={() => handleDelete(msg.id)}
-                              className="w-6 h-6 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 transition"
+                              className="text-xs font-semibold text-red-300 hover:text-red-200 transition"
                               title="Delete voice note"
                             >
                               <Trash2 size={14} />
                             </button>
                           )}
-                          <div className="text-[10px] mt-1 flex items-center justify-end gap-1 text-gray-400 dark:text-gray-500">
-                            <span>{formatTime(msg.timestamp)}</span>
-                            {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500" />}
+                          <div className="text-[10px] flex items-center text-white/50">
+                            {formatTime(msg.timestamp)}
+                            {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500  " />}
                           </div>
                         </div>
                       )
@@ -867,12 +908,13 @@ export const Chat = () => {
                 )}
               </div>
             </div>
-          ))}
+            ))
+          )}
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area - Fixed at bottom */}
-        <div className="p-3 bg-white dark:bg-gray-800 border-t dark:border-gray-700 transition-colors mb-0 relative">
+        {/* Input Area */}
+        <div className="p-3 border-t border-white/10 bg-black/20 backdrop-blur-xl relative">
           {/* Recording indicator */}
           {isRecording && (
             <div className="absolute -top-16 left-4 right-4 bg-red-100 dark:bg-red-900/30 rounded-lg p-3 flex items-center gap-2 z-50">
@@ -892,12 +934,12 @@ export const Chat = () => {
           )}
           {/* Upload progress indicator */}
           {isUploading && (
-            <div className="absolute -top-16 left-4 right-4 bg-white dark:bg-gray-800 rounded-lg p-3 shadow-lg border border-gray-100 dark:border-gray-700 flex flex-col gap-2 z-50">
+            <div className="absolute -top-16 left-4 right-4 rounded-2xl p-3 shadow-lg border border-white/10 bg-white/5 backdrop-blur-xl flex flex-col gap-2 z-50">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sending file...</span>
-                <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-sm font-medium text-white/80">Sending file...</span>
+                <Loader size="xs" showLabel={false} />
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+              <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
                 <div
                   className="bg-green-600 h-full transition-all duration-300"
                   style={{ width: `${uploadProgress || 10}%` }}
@@ -908,14 +950,14 @@ export const Chat = () => {
 
           {/* File/Image PreviewCard */}
           {fileToUpload && (
-            <div className="absolute -top-32 left-4 right-4 bg-white dark:bg-gray-800 rounded-2xl p-3 shadow-2xl border border-gray-100 dark:border-gray-700 flex flex-col gap-2 z-50 animate-in slide-in-from-bottom-4 transition-all overflow-hidden max-h-40">
+            <div className="absolute -top-32 left-4 right-4 rounded-2xl p-3 shadow-2xl border border-white/10 bg-white/5 backdrop-blur-xl flex flex-col gap-2 z-50 animate-in slide-in-from-bottom-4 transition-all overflow-hidden max-h-40">
               <div className="flex justify-between items-center px-1">
                 <span className="text-xs font-bold text-green-600 dark:text-green-500 uppercase tracking-wider">
                   {previewUrl ? 'Image Preview' : 'File Selected'}
                 </span>
                 <button
                   onClick={cancelFileSelection}
-                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition text-gray-500"
+                  className="p-1 hover:bg-white/10 rounded-full transition text-white/70"
                 >
                   <X size={16} />
                 </button>
@@ -923,19 +965,19 @@ export const Chat = () => {
 
               <div className="flex gap-4 items-center">
                 {previewUrl ? (
-                  <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-100 dark:border-gray-700 bg-gray-50 flex-shrink-0">
+                  <div className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 bg-black/20 flex-shrink-0">
                     <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
                   </div>
                 ) : (
-                  <div className="w-16 h-16 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-16 h-16 rounded-lg bg-blue-500/10 border border-white/10 flex items-center justify-center flex-shrink-0">
                     <FileText className="text-blue-600 dark:text-blue-400" size={24} />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate text-gray-900 dark:text-white">
+                  <p className="text-sm font-semibold truncate text-white">
                     {fileToUpload.name}
                   </p>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                  <p className="text-[10px] text-white/60">
                     {(fileToUpload.size / 1024 / 1024).toFixed(2)} MB • {fileToUpload.type.split('/')[1]?.toUpperCase() || 'FILE'}
                   </p>
                 </div>
@@ -943,7 +985,7 @@ export const Chat = () => {
             </div>
           )}
 
-          <form onSubmit={sendMessage} className="flex gap-2 items-center bg-gray-100 dark:bg-gray-700 rounded-full px-4 py-2 transition-colors">
+          <form onSubmit={sendMessage} className="flex gap-2 items-center rounded-full px-4 py-2 border border-white/10 bg-black/25 backdrop-blur-xl transition-colors">
             {/* Hidden File Input */}
             <input
               type="file"
@@ -958,7 +1000,7 @@ export const Chat = () => {
               type="button"
               onClick={handleFileClick}
               disabled={isSending || isRecording || isUploading}
-              className="p-2 text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 text-white/70 hover:text-green-400 transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Paperclip size={20} />
             </button>
@@ -970,7 +1012,7 @@ export const Chat = () => {
               disabled={isSending || isUploading}
               className={`p-2 rounded-full flex items-center justify-center transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${isRecording
                 ? 'bg-red-600 text-white hover:bg-red-700 animate-pulse'
-                : 'text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400'
+                : 'text-white/70 hover:text-green-400'
                 }`}
             >
               {isRecording ? <Square size={20} /> : <Mic size={20} />}
@@ -981,7 +1023,7 @@ export const Chat = () => {
               type="button"
               onClick={() => setIsStickerPickerOpen(!isStickerPickerOpen)}
               disabled={isSending || isRecording || isUploading}
-              className="p-2 text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 text-white/70 hover:text-green-400 transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Smile size={20} />
             </button>
@@ -997,7 +1039,7 @@ export const Chat = () => {
               }}
               placeholder="Message..."
               disabled={isSending || isRecording || isUploading}
-              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-sm py-2 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white disabled:opacity-50"
+              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-sm py-2 placeholder:text-white/40 text-white disabled:opacity-50"
             />
             <button
               type="submit"
@@ -1043,7 +1085,9 @@ export const Chat = () => {
             </div>
           )}
         </div>
-      </div>
+          </div>
+        </div>
+      </main>
 
       {/* Full-screen Image Preview Modal */}
       {selectedImage && (

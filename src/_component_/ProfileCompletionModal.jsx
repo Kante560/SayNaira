@@ -5,6 +5,7 @@ import { useAuth } from "../Context/AuthContext";
 import { Camera, Check, X, Sparkles, ArrowRight } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Avatar } from "./Avatar";
+import { Loader } from "./Loader";
 
 export const ProfileCompletionModal = ({ onClose }) => {
     const { user } = useAuth();
@@ -148,7 +149,7 @@ export const ProfileCompletionModal = ({ onClose }) => {
                                 {/* Uploading spinner */}
                                 {isUploadingPhoto && (
                                     <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center">
-                                        <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin" />
+                                        <Loader size="sm" showLabel={false} />
                                     </div>
                                 )}
 
@@ -262,8 +263,14 @@ export const ProfileCompletionModal = ({ onClose }) => {
                             >
                                 {isSaving ? (
                                     <>
-                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        Saving…
+                                        <Loader
+                                            size="xs"
+                                            label="Saving…"
+                                            layout="row"
+                                            showLabel
+                                            labelClassName="text-white"
+                                            imageClassName="brightness-[1.2]"
+                                        />
                                     </>
                                 ) : (
                                     <>

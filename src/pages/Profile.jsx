@@ -14,6 +14,7 @@ import { Nav } from "../Home/Nav";
 import { Edit2, Grid, X, User, Mail, Check, LogOut, Camera } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Avatar } from "../_component_/Avatar";
+import { Loader } from "../_component_/Loader";
 
 export const Profile = () => {
     const { user } = useAuth();
@@ -201,7 +202,7 @@ export const Profile = () => {
 
     /* ── Render ──────────────────────────────────────────────────── */
     return (
-        <div className="min-h-screen bg-white dark:bg-gray-900 pb-20 transition-colors duration-300">
+        <div className="min-h-screen bg-black pb-20">
             <Nav />
 
             <div className="max-w-2xl mx-auto pt-20 px-4">
@@ -227,13 +228,13 @@ export const Profile = () => {
                         </div>
                     </div>
 
-                    <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
+                    <h1 className="text-xl font-bold text-white mb-1">
                         {profileData.displayName || user.email.split("@")[0]}
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
+                    <p className="text-white/60 text-sm mb-4">
                         @{user.email.split("@")[0]}
                     </p>
-                    <p className="text-center text-gray-600 dark:text-gray-300 max-w-sm mb-6">
+                    <p className="text-center text-white/80 max-w-sm mb-6">
                         {profileData.bio}
                     </p>
 
@@ -242,8 +243,8 @@ export const Profile = () => {
                             onClick={handleEditProfile}
                             className={`${!profileExists
                                     ? "bg-green-600 hover:bg-green-700 text-white"
-                                    : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
-                                } px-6 py-2 rounded-lg font-semibold text-sm transition flex items-center gap-2`}
+                                    : "bg-white/10 text-white/80 hover:bg-white/20"
+                                } px-6 py-2 rounded-lg font-semibold text-sm transition flex items-center gap-2 backdrop-blur-xl`}
                         >
                             {!profileExists ? <Check size={16} /> : <Edit2 size={16} />}
                             {!profileExists ? "Complete Profile" : "Edit Profile"}
@@ -252,12 +253,12 @@ export const Profile = () => {
                 </div>
 
                 {/* Stats */}
-                <div className="flex justify-center border-y border-gray-100 dark:border-gray-800 py-4 mb-6 transition-colors">
+                <div className="flex justify-center border-y border-white/10 py-4 mb-6">
                     <div className="text-center">
-                        <span className="block font-bold text-gray-900 dark:text-white">
+                        <span className="block font-bold text-white">
                             {myPosts.length}
                         </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                        <span className="text-xs text-white/60">
                             Posts
                         </span>
                     </div>
@@ -265,7 +266,7 @@ export const Profile = () => {
 
                 {/* Posts Grid */}
                 <div>
-                    <div className="flex items-center gap-2 mb-4 text-gray-900 dark:text-white font-bold border-b border-gray-100 dark:border-gray-800 pb-2 transition-colors">
+                    <div className="flex items-center gap-2 mb-4 text-white font-bold border-b border-white/10 pb-2">
                         <Grid size={20} /> Posts
                     </div>
 
@@ -274,7 +275,7 @@ export const Profile = () => {
                             {[1, 2, 3].map((i) => (
                                 <div
                                     key={i}
-                                    className="aspect-square bg-gray-100 dark:bg-gray-800 animate-pulse rounded"
+                                    className="aspect-square bg-white/10 animate-pulse rounded"
                                 />
                             ))}
                         </div>
@@ -283,7 +284,7 @@ export const Profile = () => {
                             {myPosts.map((post) => (
                                 <div
                                     key={post.id}
-                                    className="aspect-square bg-gray-100 dark:bg-gray-800 relative group overflow-hidden cursor-pointer transition-colors rounded"
+                                    className="aspect-square bg-white/10 relative group overflow-hidden cursor-pointer rounded"
                                 >
                                     {post.imageUrl ? (
                                         <img
@@ -292,7 +293,7 @@ export const Profile = () => {
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                         />
                                     ) : (
-                                        <div className="p-2 text-[10px] text-gray-500 dark:text-gray-400 h-full overflow-hidden">
+                                        <div className="p-2 text-[10px] text-white/60 h-full overflow-hidden">
                                             {post.content}
                                         </div>
                                     )}
@@ -301,7 +302,7 @@ export const Profile = () => {
                         </div>
                     )}
                     {myPosts.length === 0 && !loading && (
-                        <div className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">
+                        <div className="text-center py-10 text-white/60 text-sm">
                             No posts yet.
                         </div>
                     )}
@@ -310,14 +311,14 @@ export const Profile = () => {
                 {/* Edit Profile Modal */}
                 {isEditModalOpen && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md p-6 transition-colors shadow-2xl">
+                        <div className="bg-black/90 backdrop-blur-xl rounded-2xl w-full max-w-md p-6 border border-white/10 shadow-2xl">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                                <h2 className="text-xl font-bold text-white">
                                     Edit Profile
                                 </h2>
                                 <button
                                     onClick={() => setIsEditModalOpen(false)}
-                                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                                    className="text-white/60 hover:text-white transition-colors"
                                 >
                                     <X size={20} />
                                 </button>
@@ -347,7 +348,7 @@ export const Profile = () => {
                                         {/* Uploading spinner */}
                                         {isUploadingPhoto && (
                                             <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center">
-                                                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                <Loader size="xs" showLabel={false} />
                                             </div>
                                         )}
                                         {/* Ready tick */}
@@ -370,7 +371,7 @@ export const Profile = () => {
                                             type="button"
                                             onClick={() => photoInputRef.current.click()}
                                             disabled={isUploadingPhoto}
-                                            className="flex items-center gap-2 px-4 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-full text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition disabled:opacity-50"
+                                            className="flex items-center gap-2 px-4 py-1.5 bg-white/10 text-white/80 rounded-full text-sm font-medium hover:bg-white/20 transition disabled:opacity-50"
                                         >
                                             <Camera size={14} />
                                             {isUploadingPhoto ? "Uploading…" : "Change Photo"}
@@ -379,7 +380,7 @@ export const Profile = () => {
                                             <button
                                                 type="button"
                                                 onClick={cancelPhoto}
-                                                className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition"
+                                                className="p-1.5 text-red-400 hover:bg-red-500/20 rounded-full transition"
                                             >
                                                 <X size={16} />
                                             </button>
@@ -389,7 +390,7 @@ export const Profile = () => {
 
                                 {/* Display name */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                    <label className="block text-sm font-medium text-white/80 mb-1.5">
                                         <User size={14} className="inline mr-1.5" />
                                         Display Name
                                     </label>
@@ -399,14 +400,14 @@ export const Profile = () => {
                                         onChange={(e) =>
                                             setEditForm({ ...editForm, displayName: e.target.value })
                                         }
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white transition-colors"
+                                        className="w-full px-3 py-2 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/70 bg-black/30 text-white transition-colors shadow-inner shadow-black/20"
                                         placeholder="Enter your name"
                                     />
                                 </div>
 
                                 {/* Bio */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                    <label className="block text-sm font-medium text-white/80 mb-1.5">
                                         Bio
                                     </label>
                                     <textarea
@@ -414,19 +415,19 @@ export const Profile = () => {
                                         onChange={(e) =>
                                             setEditForm({ ...editForm, bio: e.target.value })
                                         }
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white transition-colors resize-none"
+                                        className="w-full px-3 py-2 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/70 bg-black/30 text-white transition-colors resize-none shadow-inner shadow-black/20"
                                         rows={3}
                                         placeholder="Tell us about yourself"
                                         maxLength={150}
                                     />
-                                    <p className="text-xs text-gray-400 mt-1">
+                                    <p className="text-xs text-white/60 mt-1">
                                         {editForm.bio.length}/150
                                     </p>
                                 </div>
 
                                 {/* Email (read-only) */}
-                                <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                                <div className="bg-white/5 p-3 rounded-lg border border-white/10">
+                                    <p className="text-sm text-white/80">
                                         <Mail size={14} className="inline mr-1.5" />
                                         {user.email}
                                     </p>
@@ -436,7 +437,7 @@ export const Profile = () => {
                             <div className="flex gap-3 mt-6">
                                 <button
                                     onClick={() => setIsEditModalOpen(false)}
-                                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                    className="flex-1 px-4 py-2 border border-white/10 text-white/80 rounded-lg hover:bg-white/10 transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -449,8 +450,15 @@ export const Profile = () => {
                                     }
                                     className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
-                                    {isUpdating
-                                        ? "Saving…"
+                                    {isUpdating ? (
+                                        <Loader
+                                            size="xs"
+                                            label="Saving…"
+                                            layout="row"
+                                            labelClassName="text-white"
+                                            className="justify-center"
+                                        />
+                                    )
                                         : profileExists
                                             ? "Update Profile"
                                             : "Create Profile"}

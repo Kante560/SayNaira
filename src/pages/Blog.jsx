@@ -20,6 +20,7 @@ import { Link } from "react-router-dom";
 import { MessageCircle, Heart, Share2, Send, Image as ImageIcon, Copy, X } from "lucide-react";
 import { useRef } from "react";
 import { Avatar } from "../_component_/Avatar";
+import { Loader } from "../_component_/Loader";
 
 export const Blog = () => {
   const { user } = useAuth();
@@ -374,14 +375,14 @@ export const Blog = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20 transition-colors duration-300">
+    <div className="min-h-screen bg-black pb-20">
       <Nav />
 
       <div className="max-w-xl mx-auto pt-20 px-0 sm:px-4">
 
         {/* Create Post Input (Twitter/FB style) */}
         {user && (
-          <div className="bg-white dark:bg-gray-800 p-4 sm:rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 transition-colors">
+          <div className="bg-white/5 backdrop-blur-xl p-4 sm:rounded-2xl border border-white/10 mb-6">
             <div className="flex gap-4">
               <Avatar
                 src={currentUserProfile?.photoURL}
@@ -392,14 +393,14 @@ export const Blog = () => {
               <div className="flex-1">
                 <textarea
                   placeholder="What's happening?"
-                  className="w-full resize-none border-none text-lg dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 min-h-[80px] bg-transparent focus:outline-none transition-all duration-200 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                  className="w-full resize-none border-none text-lg text-white placeholder:text-white/40 min-h-[80px] bg-transparent focus:outline-none transition-all duration-200 p-3 rounded-xl hover:bg-white/5 shadow-inner shadow-black/20"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                 />
 
                 {/* Image Preview before upload */}
                 {imagePreview && (
-                  <div className="relative mx-3 mb-3 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700">
+                  <div className="relative mx-3 mb-3 rounded-xl overflow-hidden border border-white/10">
                     <img
                       src={imagePreview}
                       alt="Preview"
@@ -408,8 +409,14 @@ export const Blog = () => {
                     {/* Upload progress overlay */}
                     {isUploadingImage && (
                       <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2">
-                        <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span className="text-white text-xs font-medium">Uploading...</span>
+                        <div className="bg-black/30 rounded-full p-3 border border-white/10 backdrop-blur-sm">
+                          <Loader
+                            size="sm"
+                            label="Uploading..."
+                            labelClassName="text-white/90"
+                            className="text-white"
+                          />
+                        </div>
                         <div className="w-2/3 bg-white/30 rounded-full h-1.5">
                           <div className="bg-white h-full rounded-full transition-all" style={{ width: `${uploadProgress}%` }}></div>
                         </div>
@@ -433,7 +440,7 @@ export const Blog = () => {
                   </div>
                 )}
 
-                <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-50 dark:border-gray-700">
+                <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/10">
                   {/* Hidden file input */}
                   <input
                     type="file"
@@ -446,7 +453,7 @@ export const Blog = () => {
                     type="button"
                     onClick={() => imageInputRef.current.click()}
                     disabled={isUploadingImage}
-                    className="text-green-600 dark:text-green-400 p-2 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-full transition disabled:opacity-50"
+                    className="text-green-400 p-2 hover:bg-green-500/20 rounded-full transition disabled:opacity-50"
                     title="Add image"
                   >
                     <ImageIcon size={20} />
@@ -466,25 +473,16 @@ export const Blog = () => {
         {/* Feed */}
         <div className="space-y-4 sm:space-y-6">
           {loading ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm h-64 animate-pulse">
-                <div className="flex gap-3 mb-4">
-                  <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
-                  <div className="space-y-2">
-                    <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                    <div className="h-3 w-20 bg-gray-100 dark:bg-gray-700 rounded"></div>
-                  </div>
-                </div>
-                <div className="h-32 bg-gray-100 dark:bg-gray-700 rounded-xl"></div>
-              </div>
-            ))
+            <div className="bg-white/5 backdrop-blur-xl p-10 sm:rounded-2xl border border-white/10">
+              <Loader label="Loading posts..." />
+            </div>
           ) : posts.length === 0 ? (
-            <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm text-center">
-              <p className="text-gray-500 dark:text-gray-400">No posts yet. Be the first to share something!</p>
+            <div className="bg-white/5 backdrop-blur-xl p-8 rounded-2xl border border-white/10 text-center">
+              <p className="text-white/60">No posts yet. Be the first to share something!</p>
             </div>
           ) : (
             posts.map((post) => (
-              <article key={post.id} className="bg-white dark:bg-gray-800 sm:rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors">
+              <article key={post.id} className="bg-white/5 backdrop-blur-xl sm:rounded-2xl border border-white/10 overflow-hidden">
                 {/* Post Header */}
                 <div className="p-4 flex justify-between items-center">
                   <div className="flex items-center gap-3">
@@ -495,11 +493,11 @@ export const Blog = () => {
                         size="w-10 h-10"
                         textSize="text-sm"
                       />
-                      <div className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white dark:border-gray-800 rounded-full ${onlineUsers[post.authorId] ? "bg-green-500" : "bg-red-500"}`}></div>
+                      <div className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-black/60 rounded-full ${onlineUsers[post.authorId] ? "bg-green-500" : "bg-red-500"}`}></div>
                     </div>
                     <div>
-                      <p className="font-bold text-sm text-gray-900 dark:text-white leading-tight">{post.authorName || post.authorEmail.split('@')[0]}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="font-bold text-sm text-white leading-tight">{post.authorName || post.authorEmail.split('@')[0]}</p>
+                      <p className="text-xs text-white/60">
                         {post.createdAt?.toDate ? post.createdAt.toDate().toLocaleDateString() : new Date().toLocaleDateString()}
                       </p>
                     </div>
@@ -511,9 +509,9 @@ export const Blog = () => {
 
                 {/* Post Content */}
                 <div className="px-4 pb-2">
-                  {post.title && post.title !== "Untitled" && <h3 className="font-bold mb-2 text-gray-900 dark:text-white">{post.title}</h3>}
+                  {post.title && post.title !== "Untitled" && <h3 className="font-bold mb-2 text-white">{post.title}</h3>}
                   {post.content && (
-                    <p className="text-gray-800 dark:text-gray-200 text-[15px] whitespace-pre-wrap leading-relaxed mb-3">
+                    <p className="text-white/90 text-[15px] whitespace-pre-wrap leading-relaxed mb-3">
                       {post.content}
                     </p>
                   )}
@@ -530,13 +528,13 @@ export const Blog = () => {
                 </div>
 
                 {/* Actions */}
-                <div className="px-4 py-3 flex items-center justify-between border-t border-gray-50 dark:border-gray-700 mt-2 transition-colors">
+                <div className="px-4 py-3 flex items-center justify-between border-t border-white/10 mt-2">
                   <div className="flex items-center gap-6">
                     <button
                       onClick={() => handleLike(post.id, post.likes || [])}
                       className={`flex items-center gap-2 transition group ${(post.likes || []).includes(user?.uid)
-                        ? "text-red-500 dark:text-red-400"
-                        : "text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400"
+                        ? "text-red-400"
+                        : "text-white/60 hover:text-red-400"
                         }`}
                     >
                       <Heart
@@ -550,7 +548,7 @@ export const Blog = () => {
                     </button>
                     <button
                       onClick={() => toggleComments(post.id)}
-                      className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition"
+                      className="flex items-center gap-2 text-white/60 hover:text-blue-400 transition"
                     >
                       <MessageCircle size={22} />
                       <span className="text-sm font-medium">{comments[post.id]?.length || 0}</span>
@@ -560,33 +558,33 @@ export const Blog = () => {
                     <div className="relative share-dropdown">
                       <button
                         onClick={() => toggleShareOptions(post.id)}
-                        className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-green-500 dark:hover:text-green-500 transition"
+                        className="flex items-center gap-2 text-white/60 hover:text-green-400 transition"
                       >
                         <Share2 size={22} />
                       </button>
 
                       {/* Share Options Dropdown */}
                       {showShareOptions[post.id] && (
-                        <div className="absolute bottom-8 left-0 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 text-sm space-y-1 z-50 border border-gray-200 dark:border-gray-700 min-w-[150px]">
+                        <div className="absolute bottom-8 left-0 bg-black/90 backdrop-blur-xl shadow-lg rounded-lg p-2 text-sm space-y-1 z-50 border border-white/10 min-w-[150px]">
                           <button
                             onClick={() => {
                               handleWhatsAppShare(post);
                               toggleShareOptions(post.id);
                             }}
-                            className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                            className="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10 rounded transition-colors"
                           >
                             <span className="text-green-500">📱</span>
-                            <span className="text-gray-700 dark:text-gray-200">WhatsApp</span>
+                            <span className="text-white/80">WhatsApp</span>
                           </button>
                           <button
                             onClick={() => {
                               handleCopyLink(post);
                               toggleShareOptions(post.id);
                             }}
-                            className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                            className="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10 rounded transition-colors"
                           >
-                            <Copy size={16} className="text-gray-500" />
-                            <span className="text-gray-700 dark:text-gray-200">Copy Link</span>
+                            <Copy size={16} className="text-white/60" />
+                            <span className="text-white/80">Copy Link</span>
                           </button>
                         </div>
                       )}
@@ -597,7 +595,7 @@ export const Blog = () => {
                   {post.authorId !== user?.uid && (
                     <Link
                       to={`/chat/${post.authorId}`}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-green-50 dark:hover:bg-green-900/40 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 rounded-full text-xs font-bold transition"
+                      className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-green-500/20 text-white/80 hover:text-green-400 rounded-full text-xs font-bold transition"
                     >
                       <Send size={14} />
                       Message
@@ -607,14 +605,14 @@ export const Blog = () => {
 
                 {/* Likes count */}
                 <div className="px-4 pb-4">
-                  <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                  <p className="text-sm font-bold text-white/80">
                     {post.likes?.length || 0} {post.likes?.length === 1 ? "like" : "likes"}
                   </p>
                 </div>
 
                 {/* Comments Section */}
                 {showComments[post.id] && (
-                  <div className="border-t border-gray-100 dark:border-gray-700">
+                  <div className="border-t border-white/10">
                     {/* Comments List */}
                     <div className="px-4 py-3 space-y-3 max-h-64 overflow-y-auto">
                       {comments[post.id]?.length > 0 ? (
@@ -628,21 +626,21 @@ export const Blog = () => {
                             />
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
-                                <p className="font-bold text-sm text-gray-900 dark:text-white">
+                                <p className="font-bold text-sm text-white">
                                   {comment.authorName || comment.authorEmail.split('@')[0]}
                                 </p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                <p className="text-xs text-white/60">
                                   {comment.createdAt?.toDate ? comment.createdAt.toDate().toLocaleString() : new Date().toLocaleString()}
                                 </p>
                               </div>
-                              <p className="text-gray-800 dark:text-gray-200 text-sm">
+                              <p className="text-white/80 text-sm">
                                 {comment.text}
                               </p>
                             </div>
                           </div>
                         ))
                       ) : (
-                        <p className="text-gray-500 dark:text-gray-400 text-sm text-center py-4">
+                        <p className="text-white/60 text-sm text-center py-4">
                           No comments yet. Be the first to comment!
                         </p>
                       )}
@@ -650,7 +648,7 @@ export const Blog = () => {
 
                     {/* Comment Input */}
                     {user && (
-                      <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+                      <div className="px-4 py-3 border-t border-white/10">
                         <div className="flex gap-2">
                           <Avatar
                             src={currentUserProfile?.photoURL}
@@ -672,7 +670,7 @@ export const Blog = () => {
                                   handleCommentSubmit(post.id);
                                 }
                               }}
-                              className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 border-0 rounded-full text-sm focus:outline-none transition-all duration-200 hover:bg-gray-200 dark:hover:bg-gray-600 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                              className="flex-1 px-4 py-2.5 bg-black/30 border border-white/10 rounded-full text-sm focus:outline-none transition-all duration-200 hover:bg-white/10 text-white placeholder:text-white/40 shadow-inner shadow-black/20"
                             />
                             <button
                               onClick={() => handleCommentSubmit(post.id)}
