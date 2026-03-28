@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { db } from "../../firebase";
 import { Nav } from "../Home/Nav";
 import { toast } from "react-hot-toast";
@@ -16,7 +17,7 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { useAuth } from "../Context/AuthContext";
-import { ArrowLeft, Send, Check, Smile, Mic, Square, Trash2, Edit, MoreVertical, Paperclip, FileText, X } from "lucide-react";
+import { ArrowLeft, Send, Check, Smile, Mic, Square, Trash2, Edit, MoreVertical, Paperclip, FileText, X, Plus } from "lucide-react";
 import { Avatar } from "./Avatar";
 import { StickerPicker } from "./StickerPicker";
 import { Loader } from "./Loader";
@@ -41,6 +42,7 @@ export const Chat = () => {
   const [recordingTime, setRecordingTime] = useState(0);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingIntervalRef = useRef(null);
@@ -53,6 +55,8 @@ export const Chat = () => {
   const [fileToUpload, setFileToUpload] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
 
   const chatId = [user.uid, recipientId].sort().join("_");
 
@@ -207,14 +211,25 @@ export const Chat = () => {
         { merge: true }
       );
 
-      await addDoc(collection(db, "chats", chatId, "messages"), {
+      const messageData = {
         type: "text",
         text: messageText,
         senderId: user.uid,
         receiverId: recipientId,
         timestamp: serverTimestamp(),
         read: false,
-      });
+      };
+
+      if (replyingTo) {
+        messageData.repliedTo = {
+          id: replyingTo.id,
+          text: replyingTo.text || (replyingTo.type === "image" ? "🖼️ Image" : replyingTo.type === "voice" ? "🎤 Voice note" : replyingTo.type === "sticker" ? "🎨 Sticker" : "📁 File"),
+          senderName: replyingTo.senderId === user.uid ? "You" : (recipientInfo?.name || "Recipient"),
+          senderId: replyingTo.senderId
+        };
+      }
+
+      await addDoc(collection(db, "chats", chatId, "messages"), messageData);
 
       await addDoc(collection(db, "notifications"), {
         userId: recipientId,
@@ -222,13 +237,14 @@ export const Chat = () => {
         senderId: user.uid,
         senderEmail: user.email,
         senderName: user.displayName || user.email,
-        message: messageText.slice(0, 50),
+        message: replyingTo ? `↩️ Replying: ${messageText.slice(0, 40)}` : messageText.slice(0, 50),
         chatId: chatId,
         read: false,
         timestamp: serverTimestamp(),
       });
 
       setMessage("");
+      setReplyingTo(null);
     } catch (err) {
       console.error("Failed to send message:", err);
     } finally {
@@ -248,7 +264,7 @@ export const Chat = () => {
         { merge: true }
       );
 
-      await addDoc(collection(db, "chats", chatId, "messages"), {
+      const stickerData = {
         type: "sticker",
         stickerUrl: sticker.url,
         stickerName: sticker.name,
@@ -256,7 +272,18 @@ export const Chat = () => {
         receiverId: recipientId,
         timestamp: serverTimestamp(),
         read: false,
-      });
+      };
+
+      if (replyingTo) {
+        stickerData.repliedTo = {
+          id: replyingTo.id,
+          text: replyingTo.text || (replyingTo.type === "image" ? "🖼️ Image" : replyingTo.type === "voice" ? "🎤 Voice note" : replyingTo.type === "sticker" ? "🎨 Sticker" : "📁 File"),
+          senderName: replyingTo.senderId === user.uid ? "You" : (recipientInfo?.name || "Recipient"),
+          senderId: replyingTo.senderId
+        };
+      }
+
+      await addDoc(collection(db, "chats", chatId, "messages"), stickerData);
 
       await addDoc(collection(db, "notifications"), {
         userId: recipientId,
@@ -269,6 +296,7 @@ export const Chat = () => {
         read: false,
         timestamp: serverTimestamp(),
       });
+      setReplyingTo(null);
     } catch (err) {
       console.error("Failed to send sticker:", err);
     } finally {
@@ -403,6 +431,17 @@ export const Chat = () => {
   const handleEditCancel = () => {
     setEditingMessage(null);
     setEditText("");
+  };
+
+  const handleReplyClick = (msg) => {
+    setReplyingTo(msg);
+    setShowMenu(null);
+    // Focus the input
+    textareaRef.current?.focus();
+  };
+
+  const cancelReply = () => {
+    setReplyingTo(null);
   };
 
   const handleDelete = async (msgId) => {
@@ -560,7 +599,7 @@ export const Chat = () => {
         );
 
         // Add voice message to Firestore
-        await addDoc(collection(db, "chats", chatId, "messages"), {
+        const voiceData = {
           type: "voice",
           audioData: base64Audio,
           duration: duration || window.pendingVoiceNoteDuration || 0,
@@ -568,10 +607,22 @@ export const Chat = () => {
           receiverId: recipientId,
           timestamp: serverTimestamp(),
           read: false,
-        });
+        };
 
-        // Clear the pending duration
+        if (replyingTo) {
+          voiceData.repliedTo = {
+            id: replyingTo.id,
+            text: replyingTo.text || (replyingTo.type === "image" ? "🖼️ Image" : replyingTo.type === "voice" ? "🎤 Voice note" : replyingTo.type === "sticker" ? "🎨 Sticker" : "📁 File"),
+            senderName: replyingTo.senderId === user.uid ? "You" : (recipientInfo?.name || "Recipient"),
+            senderId: replyingTo.senderId
+          };
+        }
+
+        await addDoc(collection(db, "chats", chatId, "messages"), voiceData);
+
+        // Clear the pending duration and reply state
         window.pendingVoiceNoteDuration = null;
+        setReplyingTo(null);
 
         // Send notification
         await addDoc(collection(db, "notifications"), {
@@ -609,13 +660,14 @@ export const Chat = () => {
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (!event.target.closest('.message-menu')) {
+      if (!event.target.closest('.message-menu') && !event.target.closest('.options-menu-trigger')) {
         setShowMenu(null);
+        setIsOptionsOpen(false);
       }
     };
 
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Cleanup recording on unmount
@@ -653,438 +705,571 @@ export const Chat = () => {
         </div>
 
         <div className="relative mx-auto w-full max-w-4xl px-3 sm:px-4 py-4 sm:py-6">
-          <div className="flex flex-col min-h-[calc(100vh-64px-32px)] rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[0_20px_70px_-30px_rgba(0,0,0,0.85)] overflow-hidden">
+          <div className="relative flex flex-col min-h-[calc(100vh-64px-32px)] rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[0_20px_70px_-30px_rgba(0,0,0,0.85)] overflow-hidden">
 
-        {/* Chat Header */}
-        <div className="flex items-center gap-3 p-4 border-b border-white/10 bg-black/20 backdrop-blur-xl">
-          <button
-            onClick={() => navigate(-1)}
-            className="text-white/80 hover:text-white hover:bg-white/10 p-2 rounded-full transition"
-            aria-label="Go back"
-          >
-            <ArrowLeft size={20} />
-          </button>
-
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="relative flex-shrink-0">
-              <Avatar
-                src={recipientInfo?.photoURL}
-                name={recipientInfo?.name || recipientInfo?.email}
-                size="w-10 h-10"
-                textSize="text-sm"
-              />
-              <div
-                className={`absolute bottom-0 right-0 w-2.5 h-2.5 border-2 border-black/60 rounded-full ${
-                  isOnline ? "bg-green-500" : "bg-red-500"
-                }`}
-              />
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-bold text-white leading-tight truncate">
-                {recipientInfo?.name || recipientInfo?.email?.split("@")[0] || "Chat"}
-              </h3>
-              <span className="text-xs text-white/60 block">
-                {isOnline ? "Active now" : "Offline"}
-              </span>
-            </div>
-          </div>
-
-          <div className="ml-auto text-xs text-white/50 hidden sm:block">
-            {isChatLoading ? "Connecting…" : "Connected"}
-          </div>
-        </div>
-
-
-
-
-
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-10 no-scrollbar">
-          {isChatLoading ? (
-            <div className="h-full min-h-[320px] flex items-center justify-center">
-              <Loader label="Loading chat..." />
-            </div>
-          ) : (
-            messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.senderId === user.uid ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`${msg.type === "sticker" ? "max-w-[150px]" : "max-w-[75%] px-4 py-2"
-                  } rounded-2xl ${msg.senderId === user.uid
-                    ? msg.type === "sticker" ? "" : "bg-green-600 text-white rounded-tr-none"
-                    : msg.type === "sticker"
-                      ? ""
-                      : "bg-white/10 text-white/90 shadow-sm border border-white/10 backdrop-blur-xl rounded-tl-none"
-                  }`}
+            {/* Chat Header */}
+            <div className="flex items-center gap-3 p-4 border-b border-white/10 bg-black/20 backdrop-blur-xl">
+              <button
+                onClick={() => navigate(-1)}
+                className="text-white/80 hover:text-white hover:bg-white/10 p-2 rounded-full transition"
+                aria-label="Go back"
               >
-                {/* Edit mode */}
-                {editingMessage === msg.id && msg.type !== "sticker" ? (
-                  <div className="flex flex-col gap-2">
-                    <input
-                      type="text"
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleEditSubmit(msg.id);
-                        } else if (e.key === 'Escape') {
-                          handleEditCancel();
-                        }
-                      }}
-                      className="bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500"
-                      autoFocus
-                      disabled={isSending}
-                    />
-                    <div className="flex gap-2 justify-end">
+                <ArrowLeft size={20} />
+              </button>
+
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative flex-shrink-0">
+                  <Avatar
+                    src={recipientInfo?.photoURL}
+                    name={recipientInfo?.name || recipientInfo?.email}
+                    size="w-10 h-10"
+                    textSize="text-sm"
+                  />
+                  <div
+                    className={`absolute bottom-0 right-0 w-2.5 h-2.5 border-2 border-black/60 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"
+                      }`}
+                  />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-white leading-tight truncate">
+                    {recipientInfo?.name || recipientInfo?.email?.split("@")[0] || "Chat"}
+                  </h3>
+                  <span className="text-xs text-white/60 block">
+                    {isOnline ? "Active now" : "Offline"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="ml-auto text-xs text-white/50 hidden sm:block">
+                {isChatLoading ? "Connecting…" : "Connected"}
+              </div>
+            </div>
+
+
+
+
+
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-4 pb-32 space-y-10 no-scrollbar relative">
+              {isChatLoading ? (
+                <div className="h-full min-h-[320px] flex items-center justify-center">
+                  <Loader label="Loading chat..." />
+                </div>
+              ) : (
+                messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.senderId === user.uid ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`${msg.type === "sticker" ? "max-w-[150px]" : "max-w-[75%] px-4 py-2"
+                        } rounded-2xl relative ${msg.senderId === user.uid
+                          ? msg.type === "sticker" ? "" : "bg-green-600 text-white rounded-tr-none"
+                          : msg.type === "sticker"
+                            ? ""
+                            : "bg-[#1e1e1e]/90 text-white/90 shadow-sm border border-white/10 backdrop-blur-3xl rounded-tl-none"
+                        }`}
+                    >
+                      {/* Replied Message Display inside bubble */}
+                      {msg.repliedTo && (
+                        <div className={`mb-2 p-2 rounded-lg border-l-4 text-xs bg-black/30 backdrop-blur-sm ${msg.senderId === user.uid ? "border-green-300" : "border-green-500"}`}>
+                          <div className="font-bold mb-0.5 text-green-400">
+                            {msg.repliedTo.senderName}
+                          </div>
+                          <div className="opacity-70 truncate line-clamp-1 italic">
+                            {msg.repliedTo.text}
+                          </div>
+                        </div>
+                      )}
+                      {/* Edit mode */}
+                      {editingMessage === msg.id && msg.type !== "sticker" ? (
+                        <div className="flex flex-col gap-2">
+                          <input
+                            type="text"
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleEditSubmit(msg.id);
+                              } else if (e.key === 'Escape') {
+                                handleEditCancel();
+                              }
+                            }}
+                            className="bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+                            autoFocus
+                            disabled={isSending}
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={handleEditCancel}
+                              disabled={isSending}
+                              className="px-3 py-1 text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-300 dark:hover:bg-gray-500 transition disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleEditSubmit(msg.id)}
+                              disabled={!editText.trim() || isSending}
+                              className="px-3 py-1 text-xs bg-green-600 text-white rounded-full hover:bg-green-700 transition disabled:opacity-50"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Render sticker, voice, or text */}
+                          {msg.type === "sticker" ? (
+                            <div>
+                              <img
+                                src={msg.stickerUrl}
+                                alt={msg.stickerName || "Sticker"}
+                                className="w-32 h-32 object-contain"
+                              />
+                              <div className="text-[10px] mt-1 flex items-center justify-end gap-1 text-gray-400 dark:text-gray-500">
+                                <span>{formatTime(msg.timestamp)}</span>
+                                {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500" />}
+                              </div>
+                            </div>
+                          ) : msg.type === "voice" ? (
+                            msg.deletedForEveryone ? (
+                              <div className="text-white/60 italic text-sm">
+                                🎤 Voice note deleted
+                              </div>
+                            ) : (
+                              <div>
+                                <div className="rounded-2xl p-3.5 sm:p-4 flex items-center gap-3 border border-white/10 bg-black/25 backdrop-blur-xl">
+
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-white text-sm leading-tight">
+                                      Voice note
+                                    </p>
+                                    <p className="text-xs text-white/60">
+                                      {playingMessageId === msg.id
+                                        ? formatRecordingTime(currentPlaybackTime)
+                                        : msg.duration
+                                          ? formatRecordingTime(msg.duration)
+                                          : "0:00"
+                                      }
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={() => playVoiceNote(msg.audioData, msg.id)}
+                                    className="w-9 h-9 bg-green-600 text-white rounded-full flex items-center justify-center hover:bg-green-700 transition shadow-[0_14px_40px_-20px_rgba(34,197,94,0.7)] active:scale-[0.99]"
+                                    aria-label={playingMessageId === msg.id && !currentAudioRef.current?.paused ? "Pause voice note" : "Play voice note"}
+                                  >
+                                    <span className="text-xs font-bold">
+                                      {playingMessageId === msg.id && !currentAudioRef.current?.paused ? (
+                                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+                                          <rect x="6" y="4" width="4" height="16" rx="1" />
+                                          <rect x="14" y="4" width="4" height="16" rx="1" />
+                                        </svg>
+                                      ) : (
+                                        '▶'
+                                      )}
+                                    </span>
+                                  </button>
+                                </div>
+                                {/* Delete button for own voice notes */}
+                                {msg.senderId === user.uid && (
+                                  <button
+                                    onClick={() => handleDelete(msg.id)}
+                                    className="text-xs font-semibold text-red-300 hover:text-red-200 transition"
+                                    title="Delete voice note"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                                <div className="text-[10px] flex items-center text-white/50">
+                                  {formatTime(msg.timestamp)}
+                                  {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500  " />}
+                                </div>
+                              </div>
+                            )
+                          ) : msg.type === "image" ? (
+                            <div className="flex flex-col gap-1">
+                              <img
+                                src={msg.fileUrl}
+                                alt={msg.fileName}
+                                className="max-w-full rounded-lg cursor-zoom-in hover:opacity-95 transition"
+                                onClick={() => setSelectedImage(msg.fileUrl)}
+                              />
+                              {msg.text && <p className="text-[15px] mt-2 mb-1">{msg.text}</p>}
+                              <div className="text-[10px] mt-1 flex items-center justify-end gap-1 text-gray-400 dark:text-gray-500">
+                                <span>{formatTime(msg.timestamp)}</span>
+                                {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500" />}
+                              </div>
+                            </div>
+                          ) : msg.type === "file" ? (
+                            <div className="flex flex-col gap-1">
+                              <a
+                                href={msg.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+                              >
+                                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded flex items-center justify-center">
+                                  <FileText className="text-blue-600 dark:text-blue-400" size={20} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{msg.fileName}</p>
+                                  <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase">{msg.fileType?.split('/')[1] || 'FILE'}</p>
+                                </div>
+                              </a>
+                              {msg.text && <p className="text-[15px] mt-2 mb-1">{msg.text}</p>}
+                              <div className="text-[10px] mt-1 flex items-center justify-end gap-1 text-gray-400 dark:text-gray-500">
+                                <span>{formatTime(msg.timestamp)}</span>
+                                {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500" />}
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-[15px]">{msg.text}</p>
+                              {msg.edited && (
+                                <span className="text-[10px] italic text-gray-400 dark:text-gray-500"> (edited)</span>
+                              )}
+                              <div className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${msg.senderId === user.uid ? "text-green-100" : "text-gray-400 dark:text-gray-500"}`}>
+                                <span>{formatTime(msg.timestamp)}</span>
+                                {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} />}
+                              </div>
+                            </>
+                          )}
+                        </>
+                      )}
+
+                      {/* Menu for all messages */}
+                      {editingMessage !== msg.id && (
+                        <div className="message-menu absolute top-1 -right-4 z-20">
+                          <button
+                            onClick={() => toggleMenu(msg.id)}
+                            className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${msg.senderId === user.uid ? "bg-green-700/80 hover:bg-green-800" : "bg-white/10 hover:bg-white/20 border border-white/10"
+                              }`}
+                          >
+                            <MoreVertical size={10} className="text-white/70" />
+                          </button>
+
+                          <AnimatePresence>
+                            {showMenu === msg.id && (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.9, x: 10 }}
+                                animate={{ opacity: 1, scale: 1, x: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, x: 10 }}
+                                className="absolute top-6 right-0 bg-[#1e1e1e]/95 backdrop-blur-2xl rounded-xl shadow-2xl p-1 z-[110] border border-white/10 min-w-[110px]"
+                              >
+                                <button
+                                  onClick={() => handleReplyClick(msg)}
+                                  className="flex items-center gap-2 px-3 py-2 text-[11px] hover:bg-white/10 rounded-lg transition w-full text-left"
+                                >
+                                  <Send size={11} className="rotate-[-45deg] scale-x-[-1]" />
+                                  <span>Reply</span>
+                                </button>
+
+                                {msg.senderId === user.uid && msg.type === "text" && (
+                                  <button
+                                    onClick={() => handleEditClick(msg)}
+                                    className="flex items-center gap-2 px-3 py-2 text-[11px] hover:bg-white/10 rounded-lg transition w-full text-left"
+                                  >
+                                    <Edit size={11} />
+                                    <span>Edit</span>
+                                  </button>
+                                )}
+
+                                {msg.senderId === user.uid && (
+                                  <button
+                                    onClick={() => handleDelete(msg.id)}
+                                    className="flex items-center gap-2 px-3 py-2 text-[11px] hover:bg-red-500/20 rounded-lg transition w-full text-left text-red-500"
+                                  >
+                                    <Trash2 size={11} />
+                                    <span>Delete</span>
+                                  </button>
+                                )}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input Area - Floating & Fixed for mobile UX */}
+            <div className="fixed md:absolute bottom-0 inset-x-0 p-4 pb-6 z-50 pointer-events-none">
+              <div className="max-w-4xl mx-auto w-full pointer-events-auto">
+                {/* Recording indicator */}
+                {isRecording && (
+                  <div className="absolute -top-16 left-4 right-4 bg-red-500/20 backdrop-blur-3xl border border-red-500/20 rounded-2xl p-4 flex items-center justify-between z-50 animate-in slide-in-from-bottom-2 duration-300">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                      <span className="text-red-700 dark:text-red-300 text-sm font-medium">
+                        Recording... {formatRecordingTime(recordingTime)}
+                      </span>
+                    </div>
+                    <button
+                      onClick={stopRecording}
+                      className="px-3 py-1 text-xs bg-red-600 text-white rounded-full hover:bg-red-700 transition"
+                    >
+                      Stop
+                    </button>
+                  </div>
+                )}
+                {/* Upload progress indicator */}
+                {isUploading && (
+                  <div className="absolute -top-16 left-4 right-4 rounded-2xl p-4 shadow-2xl border border-white/10 bg-black/60 backdrop-blur-3xl flex flex-col gap-2 z-50 animate-in slide-in-from-bottom-2 duration-300">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-white/80">Sending file...</span>
+                      <Loader size="xs" showLabel={false} />
+                    </div>
+                    <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-green-600 h-full transition-all duration-300"
+                        style={{ width: `${uploadProgress || 10}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* File/Image PreviewCard */}
+                {fileToUpload && (
+                  <div className="absolute -top-36 left-4 right-4 rounded-2xl p-4 shadow-2xl border border-white/10 bg-black/80 backdrop-blur-3xl flex flex-col gap-3 z-[60] animate-in slide-in-from-bottom-4 duration-300 overflow-hidden max-h-48">
+                    <div className="flex justify-between items-center px-1">
+                      <span className="text-xs font-bold text-green-600 dark:text-green-500 uppercase tracking-wider">
+                        {previewUrl ? 'Image Preview' : 'File Selected'}
+                      </span>
                       <button
-                        onClick={handleEditCancel}
-                        disabled={isSending}
-                        className="px-3 py-1 text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-300 dark:hover:bg-gray-500 transition disabled:opacity-50"
+                        onClick={cancelFileSelection}
+                        className="p-1 hover:bg-white/10 rounded-full transition text-white/70"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+
+                    <div className="flex gap-4 items-center">
+                      {previewUrl ? (
+                        <div className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 bg-black/20 flex-shrink-0">
+                          <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 rounded-lg bg-blue-500/10 border border-white/10 flex items-center justify-center flex-shrink-0">
+                          <FileText className="text-blue-600 dark:text-blue-400" size={24} />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate text-white">
+                          {fileToUpload.name}
+                        </p>
+                        <p className="text-[10px] text-white/60">
+                          {(fileToUpload.size / 1024 / 1024).toFixed(2)} MB • {fileToUpload.type.split('/')[1]?.toUpperCase() || 'FILE'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                 {/* Reply Preview Above Input */}
+                <AnimatePresence>
+                  {replyingTo && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 20 }}
+                      className="absolute -top-16 left-0 right-0 p-3 bg-[#1e1e1e]/90 backdrop-blur-3xl border border-white/10 border-l-4 border-l-green-600 rounded-t-2xl z-40 flex items-center justify-between"
+                    >
+                      <div className="flex-1 min-w-0 pr-4">
+                        <div className="text-xs font-bold text-green-400 truncate">
+                          Replying to {replyingTo.senderId === user.uid ? "yourself" : (recipientInfo?.name || "Recipient")}
+                        </div>
+                        <div className="text-[11px] text-white/50 truncate">
+                          {replyingTo.text || (replyingTo.type === "image" ? "🖼️ Image" : replyingTo.type === "voice" ? "🎤 Voice note" : replyingTo.type === "sticker" ? "🎨 Sticker" : "📁 File")}
+                        </div>
+                      </div>
+                      <button
+                        onClick={cancelReply}
+                        className="p-1.5 hover:bg-white/10 rounded-full transition text-white/40"
+                      >
+                        <X size={16} />
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="relative">
+                  {/* Options Menu Overlay for Mobile */}
+                  <AnimatePresence>
+                    {isOptionsOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        className="absolute bottom-full left-2 mb-4 flex flex-col gap-3 z-[100]"
+                      >
+                        {/* File upload item */}
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          type="button"
+                          onClick={() => {
+                            handleFileClick();
+                            setIsOptionsOpen(false);
+                          }}
+                          disabled={isSending || isRecording || isUploading}
+                          className="flex items-center gap-3 p-3 bg-[#1e1e1e]/90 backdrop-blur-3xl border border-white/10 rounded-2xl text-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] group disabled:opacity-50"
+                        >
+                          <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 group-hover:scale-110 group-hover:bg-blue-500/20 transition-all shrink-0">
+                            <FileText size={24} />
+                          </div>
+                          <div className="flex flex-col items-start pr-6">
+                            <span className="text-sm font-bold tracking-wide">Documents</span>
+                            <span className="text-[11px] text-white/40">PDF, Word, TXT, etc.</span>
+                          </div>
+                        </motion.button>
+
+                        {/* Sticker item */}
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          type="button"
+                          onClick={() => {
+                            setIsStickerPickerOpen(true);
+                            setIsOptionsOpen(false);
+                          }}
+                          disabled={isSending || isRecording || isUploading}
+                          className="flex items-center gap-3 p-3 bg-[#1e1e1e]/90 backdrop-blur-3xl border border-white/10 rounded-2xl text-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] group disabled:opacity-50"
+                        >
+                          <div className="w-12 h-12 bg-yellow-500/10 rounded-xl flex items-center justify-center text-yellow-400 group-hover:scale-110 group-hover:bg-yellow-500/20 transition-all shrink-0">
+                            <Smile size={24} />
+                          </div>
+                          <div className="flex flex-col items-start pr-6">
+                            <span className="text-sm font-bold tracking-wide">Stickers</span>
+                            <span className="text-[11px] text-white/40">Send fun stickers</span>
+                          </div>
+                        </motion.button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <form
+                    onSubmit={sendMessage}
+                    className="flex gap-x-2 items-end w-full pointer-events-auto"
+                  >
+                    {/* Main Input Pill - WhatsApp style */}
+                    <div
+                      className="flex-1 flex gap-1 items-end rounded-[26px] py-1.5 px-2 border border-white/10 bg-[#1e1e1e]/90 backdrop-blur-3xl shadow-xl ring-1 ring-white/5 focus-within:ring-green-500/20 group transition-all duration-300"
+                    >
+                      {/* Emoji/Sticker Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => setIsStickerPickerOpen(true)}
+                        disabled={isSending || isRecording || isUploading}
+                        className="p-2 text-white/50 hover:text-white transition-colors shrink-0"
+                      >
+                        <Smile size={24} strokeWidth={2} />
+                      </button>
+
+                      <div className="flex-1 min-w-0 py-1.5">
+                        <textarea
+                          ref={textareaRef}
+                          rows={1}
+                          value={message}
+                          onChange={(e) => {
+                            setMessage(e.target.value);
+                            if (editingMessage) handleEditCancel();
+                            if (isOptionsOpen) setIsOptionsOpen(false);
+                            // Auto-expand
+                            e.target.style.height = "auto";
+                            e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey && !isRecording && !isSending) {
+                              e.preventDefault();
+                              sendMessage(e);
+                              e.target.style.height = "auto";
+                            }
+                          }}
+                          placeholder={isRecording ? "Recording..." : "Message"}
+                          disabled={isSending || isRecording || isUploading}
+                          className="w-full bg-transparent border-none focus:ring-0 focus:outline-none text-[16px] py-0 placeholder:text-white/30 text-white selection:bg-green-500/30 resize-none max-h-32 overflow-y-auto leading-tight"
+                        />
+                      </div>
+
+                      {/* Attachment Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => setIsOptionsOpen(!isOptionsOpen)}
+                        disabled={isSending || isRecording || isUploading}
+                        className={`p-2 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 options-menu-trigger ${isOptionsOpen ? 'text-green-500 scale-110' : 'text-white/50 hover:text-white'
+                          } disabled:opacity-50`}
+                      >
+                        <Paperclip size={22} className={isOptionsOpen ? 'rotate-45 transition-transform' : 'transition-transform'} />
+                      </button>
+                    </div>
+
+                    {/* Separate Circle Send/Mic Button */}
+                    <button
+                      type={message.trim() || fileToUpload ? "submit" : "button"}
+                      onClick={message.trim() || fileToUpload ? undefined : (isRecording ? stopRecording : startRecording)}
+                      disabled={isSending || isUploading}
+                      className={`w-[52px] h-[52px] rounded-full flex items-center justify-center shrink-0 transition-all duration-300 shadow-lg active:scale-95 ${isRecording
+                        ? 'bg-red-600 text-white animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.4)]'
+                        : 'bg-green-600 text-white shadow-[0_4px_15px_-5px_rgba(34,197,94,0.5)] hover:bg-green-500'
+                        } disabled:opacity-50 disabled:active:scale-100 flex-shrink-0`}
+                    >
+                      {message.trim() || fileToUpload ? (
+                        <Send size={20} fill="currentColor" className="ml-1" />
+                      ) : (
+                        isRecording ? <Square size={20} fill="currentColor" /> : <Mic size={22} />
+                      )}
+                    </button>
+
+                    {/* Hidden File Input */}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                    />
+                  </form>
+                </div>
+              </div>
+
+              {/* Sticker Picker */}
+              <StickerPicker
+                isOpen={isStickerPickerOpen}
+                onClose={() => setIsStickerPickerOpen(false)}
+                onSelectSticker={sendSticker}
+              />
+
+              {/* Delete Confirmation Dialog */}
+              {showDeleteConfirm && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm mx-4 shadow-xl">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                      Delete Message
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-300 mb-6">
+                      Are you sure you want to delete this message for everyone? This action cannot be undone.
+                    </p>
+                    <div className="flex gap-3 justify-end">
+                      <button
+                        onClick={cancelDelete}
+                        className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
                       >
                         Cancel
                       </button>
                       <button
-                        onClick={() => handleEditSubmit(msg.id)}
-                        disabled={!editText.trim() || isSending}
-                        className="px-3 py-1 text-xs bg-green-600 text-white rounded-full hover:bg-green-700 transition disabled:opacity-50"
+                        onClick={confirmDelete}
+                        className="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 transition"
                       >
-                        Save
+                        Delete
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <>
-                    {/* Render sticker, voice, or text */}
-                    {msg.type === "sticker" ? (
-                      <div>
-                        <img
-                          src={msg.stickerUrl}
-                          alt={msg.stickerName || "Sticker"}
-                          className="w-32 h-32 object-contain"
-                        />
-                        <div className="text-[10px] mt-1 flex items-center justify-end gap-1 text-gray-400 dark:text-gray-500">
-                          <span>{formatTime(msg.timestamp)}</span>
-                          {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500" />}
-                        </div>
-                      </div>
-                    ) : msg.type === "voice" ? (
-                      msg.deletedForEveryone ? (
-                        <div className="text-white/60 italic text-sm">
-                          🎤 Voice note deleted
-                        </div>
-                      ) : (
-                        <div>
-                          <div className="rounded-2xl p-3.5 sm:p-4 flex items-center gap-3 border border-white/10 bg-black/25 backdrop-blur-xl">
-                            
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-white text-sm leading-tight">
-                                Voice note
-                              </p>
-                              <p className="text-xs text-white/60">
-                                {playingMessageId === msg.id
-                                  ? formatRecordingTime(currentPlaybackTime)
-                                  : msg.duration
-                                    ? formatRecordingTime(msg.duration)
-                                    : "0:00"
-                                }
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => playVoiceNote(msg.audioData, msg.id)}
-                              className="w-9 h-9 bg-green-600 text-white rounded-full flex items-center justify-center hover:bg-green-700 transition shadow-[0_14px_40px_-20px_rgba(34,197,94,0.7)] active:scale-[0.99]"
-                              aria-label={playingMessageId === msg.id && !currentAudioRef.current?.paused ? "Pause voice note" : "Play voice note"}
-                            >
-                              <span className="text-xs font-bold">
-                                {playingMessageId === msg.id && !currentAudioRef.current?.paused ? (
-                                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
-                                    <rect x="6" y="4" width="4" height="16" rx="1" />
-                                    <rect x="14" y="4" width="4" height="16" rx="1" />
-                                  </svg>
-                                ) : (
-                                  '▶'
-                                )}
-                              </span>
-                            </button>
-                          </div>
-                          {/* Delete button for own voice notes */}
-                          {msg.senderId === user.uid && (
-                            <button
-                              onClick={() => handleDelete(msg.id)}
-                              className="text-xs font-semibold text-red-300 hover:text-red-200 transition"
-                              title="Delete voice note"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                          <div className="text-[10px] flex items-center text-white/50">
-                            {formatTime(msg.timestamp)}
-                            {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500  " />}
-                          </div>
-                        </div>
-                      )
-                    ) : msg.type === "image" ? (
-                      <div className="flex flex-col gap-1">
-                        <img
-                          src={msg.fileUrl}
-                          alt={msg.fileName}
-                          className="max-w-full rounded-lg cursor-zoom-in hover:opacity-95 transition"
-                          onClick={() => setSelectedImage(msg.fileUrl)}
-                        />
-                        {msg.text && <p className="text-[15px] mt-2 mb-1">{msg.text}</p>}
-                        <div className="text-[10px] mt-1 flex items-center justify-end gap-1 text-gray-400 dark:text-gray-500">
-                          <span>{formatTime(msg.timestamp)}</span>
-                          {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500" />}
-                        </div>
-                      </div>
-                    ) : msg.type === "file" ? (
-                      <div className="flex flex-col gap-1">
-                        <a
-                          href={msg.fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition"
-                        >
-                          <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded flex items-center justify-center">
-                            <FileText className="text-blue-600 dark:text-blue-400" size={20} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{msg.fileName}</p>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase">{msg.fileType?.split('/')[1] || 'FILE'}</p>
-                          </div>
-                        </a>
-                        {msg.text && <p className="text-[15px] mt-2 mb-1">{msg.text}</p>}
-                        <div className="text-[10px] mt-1 flex items-center justify-end gap-1 text-gray-400 dark:text-gray-500">
-                          <span>{formatTime(msg.timestamp)}</span>
-                          {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} className="text-green-500" />}
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <p className="text-[15px]">{msg.text}</p>
-                        {msg.edited && (
-                          <span className="text-[10px] italic text-gray-400 dark:text-gray-500"> (edited)</span>
-                        )}
-                        <div className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${msg.senderId === user.uid ? "text-green-100" : "text-gray-400 dark:text-gray-500"}`}>
-                          <span>{formatTime(msg.timestamp)}</span>
-                          {msg.senderId === user.uid && msg.read && <Check size={12} strokeWidth={3} />}
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
-
-                {/* Menu for own messages */}
-                {msg.senderId === user.uid && msg.type !== "sticker" && msg.type !== "voice" && editingMessage !== msg.id && (
-                  <div className="message-menu relative">
-                    <button
-                      onClick={() => toggleMenu(msg.id)}
-                      className="absolute top-1 -right-4 w-5 h-5 bg-green-700 dark:bg-green-800 rounded-full flex items-center justify-center hover:bg-green-800 dark:hover:bg-green-900 transition"
-                    >
-                      <MoreVertical size={10} className="text-green-200 dark:text-green-300" />
-                    </button>
-
-                    {showMenu === msg.id && (
-                      <div className="absolute top-6 right-0 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-1 z-50 border border-gray-200 dark:border-gray-700">
-                        <button
-                          onClick={() => handleEditClick(msg)}
-                          className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition w-full text-left"
-                        >
-                          <Edit size={14} />
-                          <span className="text-gray-700 dark:text-gray-300">Edit</span>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(msg.id)}
-                          className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition w-full text-left"
-                        >
-                          <Trash2 size={14} />
-                          <span className="text-red-600 dark:text-red-400">Delete</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            ))
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input Area */}
-        <div className="p-3 border-t border-white/10 bg-black/20 backdrop-blur-xl relative">
-          {/* Recording indicator */}
-          {isRecording && (
-            <div className="absolute -top-16 left-4 right-4 bg-red-100 dark:bg-red-900/30 rounded-lg p-3 flex items-center gap-2 z-50">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                <span className="text-red-700 dark:text-red-300 text-sm font-medium">
-                  Recording... {formatRecordingTime(recordingTime)}
-                </span>
-              </div>
-              <button
-                onClick={stopRecording}
-                className="px-3 py-1 text-xs bg-red-600 text-white rounded-full hover:bg-red-700 transition"
-              >
-                Stop
-              </button>
-            </div>
-          )}
-          {/* Upload progress indicator */}
-          {isUploading && (
-            <div className="absolute -top-16 left-4 right-4 rounded-2xl p-3 shadow-lg border border-white/10 bg-white/5 backdrop-blur-xl flex flex-col gap-2 z-50">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-white/80">Sending file...</span>
-                <Loader size="xs" showLabel={false} />
-              </div>
-              <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
-                <div
-                  className="bg-green-600 h-full transition-all duration-300"
-                  style={{ width: `${uploadProgress || 10}%` }}
-                ></div>
-              </div>
-            </div>
-          )}
-
-          {/* File/Image PreviewCard */}
-          {fileToUpload && (
-            <div className="absolute -top-32 left-4 right-4 rounded-2xl p-3 shadow-2xl border border-white/10 bg-white/5 backdrop-blur-xl flex flex-col gap-2 z-50 animate-in slide-in-from-bottom-4 transition-all overflow-hidden max-h-40">
-              <div className="flex justify-between items-center px-1">
-                <span className="text-xs font-bold text-green-600 dark:text-green-500 uppercase tracking-wider">
-                  {previewUrl ? 'Image Preview' : 'File Selected'}
-                </span>
-                <button
-                  onClick={cancelFileSelection}
-                  className="p-1 hover:bg-white/10 rounded-full transition text-white/70"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="flex gap-4 items-center">
-                {previewUrl ? (
-                  <div className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 bg-black/20 flex-shrink-0">
-                    <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                  </div>
-                ) : (
-                  <div className="w-16 h-16 rounded-lg bg-blue-500/10 border border-white/10 flex items-center justify-center flex-shrink-0">
-                    <FileText className="text-blue-600 dark:text-blue-400" size={24} />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate text-white">
-                    {fileToUpload.name}
-                  </p>
-                  <p className="text-[10px] text-white/60">
-                    {(fileToUpload.size / 1024 / 1024).toFixed(2)} MB • {fileToUpload.type.split('/')[1]?.toUpperCase() || 'FILE'}
-                  </p>
                 </div>
-              </div>
+              )}
             </div>
-          )}
-
-          <form onSubmit={sendMessage} className="flex gap-2 items-center rounded-full px-4 py-2 border border-white/10 bg-black/25 backdrop-blur-xl transition-colors">
-            {/* Hidden File Input */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              className="hidden"
-              accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-            />
-
-            {/* File upload button */}
-            <button
-              type="button"
-              onClick={handleFileClick}
-              disabled={isSending || isRecording || isUploading}
-              className="p-2 text-white/70 hover:text-green-400 transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Paperclip size={20} />
-            </button>
-
-            {/* Voice recording button */}
-            <button
-              type="button"
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={isSending || isUploading}
-              className={`p-2 rounded-full flex items-center justify-center transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${isRecording
-                ? 'bg-red-600 text-white hover:bg-red-700 animate-pulse'
-                : 'text-white/70 hover:text-green-400'
-                }`}
-            >
-              {isRecording ? <Square size={20} /> : <Mic size={20} />}
-            </button>
-
-            {/* Sticker button */}
-            <button
-              type="button"
-              onClick={() => setIsStickerPickerOpen(!isStickerPickerOpen)}
-              disabled={isSending || isRecording || isUploading}
-              className="p-2 text-white/70 hover:text-green-400 transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Smile size={20} />
-            </button>
-
-            <input
-              value={message}
-              onChange={(e) => {
-                setMessage(e.target.value);
-                // Cancel edit if user starts typing a new message
-                if (editingMessage) {
-                  handleEditCancel();
-                }
-              }}
-              placeholder="Message..."
-              disabled={isSending || isRecording || isUploading}
-              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-sm py-2 placeholder:text-white/40 text-white disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={(!message.trim() && !fileToUpload) || isSending || isRecording || isUploading}
-              className="p-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-            >
-              <Send size={16} />
-            </button>
-          </form>
-
-          {/* Sticker Picker */}
-          <StickerPicker
-            isOpen={isStickerPickerOpen}
-            onClose={() => setIsStickerPickerOpen(false)}
-            onSelectSticker={sendSticker}
-          />
-
-          {/* Delete Confirmation Dialog */}
-          {showDeleteConfirm && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm mx-4 shadow-xl">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                  Delete Message
-                </h3>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">
-                  Are you sure you want to delete this message for everyone? This action cannot be undone.
-                </p>
-                <div className="flex gap-3 justify-end">
-                  <button
-                    onClick={cancelDelete}
-                    className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmDelete}
-                    className="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 transition"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
           </div>
         </div>
       </main>
