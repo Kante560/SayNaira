@@ -38,12 +38,6 @@ const stickerPacks = {
 export const StickerPicker = ({ isOpen, onClose, onSelectSticker }) => {
     const [activeTab, setActiveTab] = useState("emoji");
 
-    useEffect(() => {
-        if (isOpen) {
-            console.log("Sticker Picker Opened");
-        }
-    }, [isOpen]);
-
     const tabs = [
         { id: "emoji", icon: <Smile size={20} />, label: "Emoji" },
         { id: "reactions", icon: <ThumbsUp size={20} />, label: "Reactions" },
@@ -53,7 +47,6 @@ export const StickerPicker = ({ isOpen, onClose, onSelectSticker }) => {
     const handleStickerClick = (e, sticker) => {
         e.preventDefault();
         e.stopPropagation();
-        console.log("Sticker clicked:", sticker.name);
         onSelectSticker(sticker);
         onClose();
     };

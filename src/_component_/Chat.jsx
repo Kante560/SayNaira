@@ -188,14 +188,12 @@ export const Chat = () => {
       lastSentTypingStatusRef.current = val;
       
       try {
-        console.log(`[Typing] Syncing status to Firestore: ${val}`);
         const chatRef = doc(db, "chats", chatId);
         await updateDoc(chatRef, {
           [`typing.${user.uid}`]: val
         });
       } catch (err) {
-        // If document doesn't exist, we skip typing update
-        console.warn("[Typing] Sync skipped (Chat doc likely doesn't exist yet)");
+        // Doc missing - silent fail
       }
     };
 
@@ -208,33 +206,16 @@ export const Chat = () => {
     }
   }, [message, chatId, user.uid]);
 
-  // Handle recipient typing status log for debugging
-  useEffect(() => {
-    if (isRecipientTyping) {
-      console.log("[Typing] UI State: Recipient started typing");
-    } else {
-      console.log("[Typing] UI State: Recipient stopped typing");
-    }
-  }, [isRecipientTyping]);
-
   // Listen for recipient typing status
   useEffect(() => {
     if (!chatId || !recipientId) return;
 
-    console.log("[Typing] Starting listener for Chat ID:", chatId);
     const unsubscribe = onSnapshot(doc(db, "chats", chatId), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        console.log("[Typing] Entire Chat Data:", data);
         const typingMap = data.typing || {};
-        const status = !!typingMap[recipientId];
-        console.log(`[Typing] Recipient (${recipientId}) status in Firestore is:`, status);
-        setIsRecipientTyping(status);
-      } else {
-        console.log("[Typing] Chat document does not exist yet.");
+        setIsRecipientTyping(!!typingMap[recipientId]);
       }
-    }, (error) => {
-      console.error("[Typing] Listener error:", error);
     });
 
     return () => unsubscribe();
@@ -323,7 +304,6 @@ export const Chat = () => {
     setIsSending(true);
 
     try {
-      console.log("Sending sticker:", sticker.name);
       await setDoc(
         doc(db, "chats", chatId),
         { lastUpdated: serverTimestamp() },
@@ -362,7 +342,6 @@ export const Chat = () => {
         read: false,
         timestamp: serverTimestamp(),
       });
-      console.log("Sticker sent successfully");
       setReplyingTo(null);
       setIsStickerPickerOpen(false);
     } catch (err) {
