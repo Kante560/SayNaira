@@ -1,8 +1,7 @@
-import React, { useState } from "react";
-import { X, Smile, Heart, ThumbsUp, Flame, Star, Laugh } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, Smile, ThumbsUp, Heart } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Pre-defined sticker URLs (you can replace with your own or use an API)
 const stickerPacks = {
     emoji: [
         { id: "emoji_1", url: "https://em-content.zobj.net/thumbs/240/google/350/grinning-face_1f600.png", name: "Grinning" },
@@ -39,13 +38,22 @@ const stickerPacks = {
 export const StickerPicker = ({ isOpen, onClose, onSelectSticker }) => {
     const [activeTab, setActiveTab] = useState("emoji");
 
+    useEffect(() => {
+        if (isOpen) {
+            console.log("Sticker Picker Opened");
+        }
+    }, [isOpen]);
+
     const tabs = [
         { id: "emoji", icon: <Smile size={20} />, label: "Emoji" },
         { id: "reactions", icon: <ThumbsUp size={20} />, label: "Reactions" },
         { id: "animals", icon: <Heart size={20} />, label: "Animals" },
     ];
 
-    const handleStickerClick = (sticker) => {
+    const handleStickerClick = (e, sticker) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("Sticker clicked:", sticker.name);
         onSelectSticker(sticker);
         onClose();
     };
@@ -59,8 +67,11 @@ export const StickerPicker = ({ isOpen, onClose, onSelectSticker }) => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        onClick={onClose}
-                        className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onClose();
+                        }}
+                        className="fixed inset-0 bg-black/70 z-[9998] md:hidden backdrop-blur-md"
                     />
 
                     {/* Sticker Panel */}
@@ -69,28 +80,35 @@ export const StickerPicker = ({ isOpen, onClose, onSelectSticker }) => {
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: "100%", opacity: 0 }}
                         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                        className="fixed bottom-0 left-0 right-0 md:absolute md:bottom-20 md:left-4 md:right-auto bg-white dark:bg-gray-800 rounded-t-3xl md:rounded-2xl shadow-2xl z-50 md:w-96"
+                        className="fixed bottom-0 left-0 right-0 md:absolute md:bottom-24 md:left-4 md:right-auto bg-[#1e1e1e] border border-white/10 rounded-t-3xl md:rounded-2xl shadow-[0_-20px_60px_rgba(0,0,0,0.8)] z-[9999] md:w-96 overflow-hidden flex flex-col pointer-events-auto"
                     >
                         {/* Header */}
-                        <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
-                            <h3 className="font-bold text-gray-900 dark:text-white">Stickers</h3>
+                        <div className="flex items-center justify-between p-4 border-b border-white/10">
+                            <h3 className="font-bold text-white">Stickers & Emojis</h3>
                             <button
-                                onClick={onClose}
-                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onClose();
+                                }}
+                                className="p-2 hover:bg-white/10 rounded-full transition text-white/60"
                             >
-                                <X size={20} className="text-gray-600 dark:text-gray-300" />
+                                <X size={20} />
                             </button>
                         </div>
 
                         {/* Tabs */}
-                        <div className="flex border-b dark:border-gray-700">
+                        <div className="flex border-b border-white/10">
                             {tabs.map((tab) => (
                                 <button
                                     key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveTab(tab.id);
+                                    }}
                                     className={`flex-1 flex items-center justify-center gap-2 py-3 transition ${activeTab === tab.id
-                                            ? "text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400"
-                                            : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                                            ? "text-green-500 border-b-2 border-green-500 bg-green-500/5"
+                                            : "text-white/40 hover:text-white/70"
                                         }`}
                                 >
                                     {tab.icon}
@@ -100,32 +118,31 @@ export const StickerPicker = ({ isOpen, onClose, onSelectSticker }) => {
                         </div>
 
                         {/* Sticker Grid */}
-                        <div className="p-4 max-h-80 overflow-y-auto">
+                        <div className="p-4 max-h-80 overflow-y-auto bg-[#121212]/50">
                             <div className="grid grid-cols-4 gap-3">
                                 {stickerPacks[activeTab]?.map((sticker) => (
-                                    <motion.button
+                                    <button
                                         key={sticker.id}
-                                        onClick={() => handleStickerClick(sticker)}
-                                        whileHover={{ scale: 1.1 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        className="aspect-square bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition p-2 group"
+                                        type="button"
+                                        onClick={(e) => handleStickerClick(e, sticker)}
+                                        className="aspect-square bg-white/5 rounded-2xl hover:bg-white/10 active:scale-90 transition-all p-2 flex items-center justify-center border border-white/5 group"
                                         title={sticker.name}
                                     >
                                         <img
                                             src={sticker.url}
                                             alt={sticker.name}
-                                            className="w-full h-full object-contain"
+                                            className="w-full h-full object-contain pointer-events-none"
                                             loading="lazy"
                                         />
-                                    </motion.button>
+                                    </button>
                                 ))}
                             </div>
                         </div>
 
                         {/* Footer tip */}
-                        <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-b-3xl md:rounded-b-2xl">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                                Tap a sticker to send
+                        <div className="p-3 bg-black/30 border-t border-white/5">
+                            <p className="text-[10px] text-white/30 text-center uppercase tracking-widest font-bold">
+                                Tap to send sticker
                             </p>
                         </div>
                     </motion.div>

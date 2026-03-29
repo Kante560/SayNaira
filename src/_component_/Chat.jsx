@@ -57,6 +57,8 @@ export const Chat = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
+  const [isRecipientTyping, setIsRecipientTyping] = useState(false);
+  const lastSentTypingStatusRef = useRef(false);
 
   const chatId = [user.uid, recipientId].sort().join("_");
 
@@ -175,6 +177,69 @@ export const Chat = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Optimized Typing status sync
+  useEffect(() => {
+    if (!chatId || !user.uid) return;
+
+    const isNowTyping = message.trim().length > 0;
+
+    const updateStatus = async (val) => {
+      if (lastSentTypingStatusRef.current === val) return;
+      lastSentTypingStatusRef.current = val;
+      
+      try {
+        console.log(`[Typing] Syncing status to Firestore: ${val}`);
+        const chatRef = doc(db, "chats", chatId);
+        await updateDoc(chatRef, {
+          [`typing.${user.uid}`]: val
+        });
+      } catch (err) {
+        // If document doesn't exist, we skip typing update
+        console.warn("[Typing] Sync skipped (Chat doc likely doesn't exist yet)");
+      }
+    };
+
+    if (isNowTyping) {
+      updateStatus(true);
+      const timeout = setTimeout(() => updateStatus(false), 3000);
+      return () => clearTimeout(timeout);
+    } else if (lastSentTypingStatusRef.current === true) {
+      updateStatus(false);
+    }
+  }, [message, chatId, user.uid]);
+
+  // Handle recipient typing status log for debugging
+  useEffect(() => {
+    if (isRecipientTyping) {
+      console.log("[Typing] UI State: Recipient started typing");
+    } else {
+      console.log("[Typing] UI State: Recipient stopped typing");
+    }
+  }, [isRecipientTyping]);
+
+  // Listen for recipient typing status
+  useEffect(() => {
+    if (!chatId || !recipientId) return;
+
+    console.log("[Typing] Starting listener for Chat ID:", chatId);
+    const unsubscribe = onSnapshot(doc(db, "chats", chatId), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        console.log("[Typing] Entire Chat Data:", data);
+        const typingMap = data.typing || {};
+        const status = !!typingMap[recipientId];
+        console.log(`[Typing] Recipient (${recipientId}) status in Firestore is:`, status);
+        setIsRecipientTyping(status);
+      } else {
+        console.log("[Typing] Chat document does not exist yet.");
+      }
+    }, (error) => {
+      console.error("[Typing] Listener error:", error);
+    });
+
+    return () => unsubscribe();
+  }, [chatId, recipientId]);
+
   // Cleanup audio on component unmount
   useEffect(() => {
     return () => {
@@ -258,6 +323,7 @@ export const Chat = () => {
     setIsSending(true);
 
     try {
+      console.log("Sending sticker:", sticker.name);
       await setDoc(
         doc(db, "chats", chatId),
         { lastUpdated: serverTimestamp() },
@@ -296,9 +362,12 @@ export const Chat = () => {
         read: false,
         timestamp: serverTimestamp(),
       });
+      console.log("Sticker sent successfully");
       setReplyingTo(null);
+      setIsStickerPickerOpen(false);
     } catch (err) {
       console.error("Failed to send sticker:", err);
+      toast.error("Failed to send sticker");
     } finally {
       setIsSending(false);
     }
@@ -734,9 +803,22 @@ export const Chat = () => {
                   <h3 className="font-bold text-white leading-tight truncate">
                     {recipientInfo?.name || recipientInfo?.email?.split("@")[0] || "Chat"}
                   </h3>
-                  <span className="text-xs text-white/60 block">
-                    {isOnline ? "Active now" : "Offline"}
-                  </span>
+                  <div className="flex items-center gap-1.5 h-4">
+                    {isRecipientTyping ? (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-green-400 font-medium animate-pulse">typing</span>
+                        <div className="flex gap-0.5">
+                          <motion.div animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0 }} className="w-1 h-1 bg-green-400 rounded-full" />
+                          <motion.div animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1 h-1 bg-green-400 rounded-full" />
+                          <motion.div animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1 h-1 bg-green-400 rounded-full" />
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-white/60">
+                        {isOnline ? "Active now" : "Offline"}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -993,6 +1075,37 @@ export const Chat = () => {
                   </div>
                 ))
               )}
+
+              {/* Recipient Typing Bubble */}
+              <AnimatePresence>
+                {isRecipientTyping && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 5, scale: 0.9 }}
+                    className="flex justify-start mb-4"
+                  >
+                    <div className="bg-[#1e1e1e]/90 text-white/90 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm border border-white/10 backdrop-blur-3xl flex items-center gap-1.5 min-w-[60px] justify-center">
+                      <motion.div 
+                        animate={{ y: [0, -5, 0] }} 
+                        transition={{ repeat: Infinity, duration: 0.6, delay: 0 }} 
+                        className="w-1.5 h-1.5 bg-green-500 rounded-full" 
+                      />
+                      <motion.div 
+                        animate={{ y: [0, -5, 0] }} 
+                        transition={{ repeat: Infinity, duration: 0.6, delay: 0.15 }} 
+                        className="w-1.5 h-1.5 bg-green-500 rounded-full" 
+                      />
+                      <motion.div 
+                        animate={{ y: [0, -5, 0] }} 
+                        transition={{ repeat: Infinity, duration: 0.6, delay: 0.3 }} 
+                        className="w-1.5 h-1.5 bg-green-500 rounded-full" 
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div ref={messagesEndRef} />
             </div>
 
@@ -1158,14 +1271,14 @@ export const Chat = () => {
                     <div
                       className="flex-1 flex gap-1 items-end rounded-[26px] py-1.5 px-2 border border-white/10 bg-[#1e1e1e]/90 backdrop-blur-3xl shadow-xl ring-1 ring-white/5 focus-within:ring-green-500/20 group transition-all duration-300"
                     >
-                      {/* Emoji/Sticker Trigger */}
+                      {/* Leading Emoji/Sticker Trigger */}
                       <button
                         type="button"
-                        onClick={() => setIsStickerPickerOpen(true)}
+                        onClick={() => setIsStickerPickerOpen(!isStickerPickerOpen)}
                         disabled={isSending || isRecording || isUploading}
-                        className="p-2 text-white/50 hover:text-white transition-colors shrink-0"
+                        className={`p-2 transition-all duration-300 shrink-0 ${isStickerPickerOpen ? 'text-green-500 scale-110' : 'text-white/50 hover:text-white'}`}
                       >
-                        <Smile size={24} strokeWidth={2} />
+                        {isStickerPickerOpen ? <X size={24} /> : <Smile size={24} strokeWidth={2} />}
                       </button>
 
                       <div className="flex-1 min-w-0 py-1.5">
