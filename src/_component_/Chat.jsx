@@ -752,11 +752,11 @@ export const Chat = () => {
           <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_70%_40%,rgba(34,197,94,0.18),transparent_60%)]" />
         </div>
 
-        <div className="relative mx-auto w-full max-w-4xl px-3 sm:px-4 py-4 sm:py-6">
-          <div className="relative flex flex-col min-h-[calc(100vh-64px-32px)] rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[0_20px_70px_-30px_rgba(0,0,0,0.85)] overflow-hidden">
+        <div className="relative mx-auto w-full max-w-4xl px-3 sm:px-4 py-2 sm:py-6 h-[calc(100dvh-80px)] sm:h-[calc(100vh-120px)] flex flex-col">
+          <div className="relative flex flex-col h-full rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[0_20px_70px_-30px_rgba(0,0,0,0.85)] overflow-hidden">
 
-            {/* Chat Header */}
-            <div className="flex items-center gap-3 p-4 border-b border-white/10 bg-black/20 backdrop-blur-xl">
+            {/* Chat Header - Pinned for constant navigation accessibility */}
+            <div className="sticky top-0 z-[60] flex items-center gap-3 p-4 border-b border-white/10 bg-black/40 backdrop-blur-3xl shadow-lg">
               <button
                 onClick={() => navigate(-1)}
                 className="text-white/80 hover:text-white hover:bg-white/10 p-2 rounded-full transition"
