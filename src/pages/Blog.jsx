@@ -374,6 +374,10 @@ export const Blog = () => {
     }
   };
 
+  const handleOpenProfile = (uid) => {
+    navigate(`/profile/${uid}`);
+  };
+
   return (
     <div className="min-h-screen bg-black pb-20">
       <Nav />
@@ -384,12 +388,14 @@ export const Blog = () => {
         {user && (
           <div className="bg-white/5 backdrop-blur-xl p-4 sm:rounded-2xl border border-white/10 mb-6">
             <div className="flex gap-4">
-              <Avatar
-                src={currentUserProfile?.photoURL}
-                name={user.displayName || user.email}
-                size="w-10 h-10"
-                textSize="text-base"
-              />
+              <div onClick={() => handleOpenProfile(user.uid, currentUserProfile)} className="cursor-pointer hover:scale-105 transition-transform">
+                <Avatar
+                  src={currentUserProfile?.photoURL}
+                  name={user.displayName || user.email}
+                  size="w-10 h-10"
+                  textSize="text-base"
+                />
+              </div>
               <div className="flex-1">
                 <textarea
                   placeholder="What's happening?"
@@ -486,7 +492,10 @@ export const Blog = () => {
                 {/* Post Header */}
                 <div className="p-4 flex justify-between items-center">
                   <div className="flex items-center gap-3">
-                    <div className="relative">
+                    <div 
+                      className="relative cursor-pointer hover:scale-105 transition-transform"
+                      onClick={() => handleOpenProfile(post.authorId, { ...post, name: post.authorName, photoURL: authorProfiles[post.authorId]?.photoURL })}
+                    >
                       <Avatar
                         src={authorProfiles[post.authorId]?.photoURL}
                         name={post.authorName || post.authorEmail}
@@ -595,6 +604,15 @@ export const Blog = () => {
                   {post.authorId !== user?.uid && (
                     <Link
                       to={`/chat/${post.authorId}`}
+                      state={{ 
+                        replyReference: {
+                          id: post.id,
+                          text: post.content ? post.content.slice(0, 100) : (post.imageUrl ? "🖼️ Image post" : "Post"),
+                          senderName: post.authorName || post.authorEmail.split('@')[0],
+                          senderId: post.authorId,
+                          type: "blog_post"
+                        }
+                      }}
                       className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-green-500/20 text-white/80 hover:text-green-400 rounded-full text-xs font-bold transition"
                     >
                       <Send size={14} />
@@ -711,6 +729,7 @@ export const Blog = () => {
           />
         </div>
       )}
+
     </div>
   );
 };

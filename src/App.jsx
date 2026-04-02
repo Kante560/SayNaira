@@ -87,6 +87,7 @@ const App = () => {
           <Route path="/chat/:recipientId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/profile/:uid" element={<Profile />} />
           <Route path="/create-post" element={<ProtectedRoute><CreatePost /></ProtectedRoute>} />
 
           {/* Catch-all redirect to Home */}

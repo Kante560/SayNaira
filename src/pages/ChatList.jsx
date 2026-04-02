@@ -13,12 +13,16 @@ import { Nav } from "../Home/Nav";
 import { MessageCircle, Search, Plus } from "lucide-react";
 import { Avatar } from "../_component_/Avatar";
 import { Loader } from "../_component_/Loader";
+import { TypingIndicator } from "../_component_/TypingIndicator";
 
 export const ChatList = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [conversations, setConversations] = useState([]);
-  const [loadingChats, setLoadingChats] = useState(true);
+  const [conversations, setConversations] = useState(() => {
+    const cached = localStorage.getItem(`chats_${user?.uid}`);
+    return cached ? JSON.parse(cached) : [];
+  });
+  const [loadingChats, setLoadingChats] = useState(!conversations.length);
   const [users, setUsers] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [onlineUsers, setOnlineUsers] = useState({});
@@ -122,16 +126,24 @@ export const ChatList = () => {
             lastMessage: lastMessageText,
             timestamp: lastMessageDoc?.timestamp,
             unreadCount,
+            isTyping: chatDoc.data()?.typing?.[otherUserId] || false,
           });
         }
       }
 
       // Sort by timestamp
       chatsData.sort((a, b) => {
-        const timeA = a.timestamp ? a.timestamp.toMillis() : 0;
-        const timeB = b.timestamp ? b.timestamp.toMillis() : 0;
+        const timeA = a.timestamp ? (a.timestamp.toMillis ? a.timestamp.toMillis() : a.timestamp) : 0;
+        const timeB = b.timestamp ? (b.timestamp.toMillis ? b.timestamp.toMillis() : b.timestamp) : 0;
         return timeB - timeA;
       });
+
+      // Cache to localStorage (convert timestamps to millis for serialization)
+      const serializableData = chatsData.map(c => ({
+        ...c,
+        timestamp: c.timestamp?.toMillis ? c.timestamp.toMillis() : c.timestamp
+      }));
+      localStorage.setItem(`chats_${user.uid}`, JSON.stringify(serializableData));
 
       setConversations(chatsData);
       setLoadingChats(false);
@@ -218,7 +230,13 @@ export const ChatList = () => {
                 className="flex items-center gap-4 p-4 hover:bg-white/5 cursor-pointer transition border-b border-white/10 last:border-none"
               >
                 {/* Avatar */}
-                <div className="relative flex-shrink-0">
+                <div 
+                  className="relative flex-shrink-0 cursor-pointer hover:scale-110 transition-transform"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/profile/${conv.otherUserId}`);
+                  }}
+                >
                   <Avatar
                     src={conv.otherUserPhotoURL}
                     name={conv.otherUserName || conv.otherUserEmail}
@@ -236,14 +254,20 @@ export const ChatList = () => {
                     </h4>
                     {conv.timestamp && (
                       <span className={`text-xs ${conv.unreadCount > 0 ? "text-green-400 font-bold" : "text-white/50"}`}>
-                        {new Date(conv.timestamp.toMillis()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(conv.timestamp?.toMillis ? conv.timestamp.toMillis() : conv.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     )}
                   </div>
                   <div className="flex justify-between items-center">
-                    <p className={`text-sm truncate pr-2 ${conv.unreadCount > 0 ? "text-white font-bold" : "text-white/60"}`}>
-                      {conv.lastMessage}
-                    </p>
+                    {conv.isTyping ? (
+                      <div className="mt-1">
+                        <TypingIndicator variant="text" />
+                      </div>
+                    ) : (
+                      <p className={`text-sm truncate pr-2 ${conv.unreadCount > 0 ? "text-white font-bold" : "text-white/60"}`}>
+                        {conv.lastMessage}
+                      </p>
+                    )}
                     {conv.unreadCount > 0 && (
                       <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0">
                         {conv.unreadCount}
@@ -386,6 +410,7 @@ export const ChatList = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };

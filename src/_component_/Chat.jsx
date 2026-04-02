@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { db } from "../../firebase";
 import { Nav } from "../Home/Nav";
@@ -21,11 +21,13 @@ import { ArrowLeft, Send, Check, Smile, Mic, Square, Trash2, Edit, MoreVertical,
 import { Avatar } from "./Avatar";
 import { StickerPicker } from "./StickerPicker";
 import { Loader } from "./Loader";
+import { TypingIndicator } from "./TypingIndicator";
 
 export const Chat = () => {
   const { recipientId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [isChatLoading, setIsChatLoading] = useState(true);
@@ -199,7 +201,7 @@ export const Chat = () => {
 
     if (isNowTyping) {
       updateStatus(true);
-      const timeout = setTimeout(() => updateStatus(false), 3000);
+      const timeout = setTimeout(() => updateStatus(false), 5000);
       return () => clearTimeout(timeout);
     } else if (lastSentTypingStatusRef.current === true) {
       updateStatus(false);
@@ -231,6 +233,20 @@ export const Chat = () => {
       stopPlaybackTimer();
     };
   }, []);
+
+  useEffect(() => {
+    if (location.state?.replyReference) {
+      setReplyingTo({
+        id: location.state.replyReference.id,
+        text: location.state.replyReference.text,
+        senderName: location.state.replyReference.senderName,
+        senderId: location.state.replyReference.senderId,
+        type: location.state.replyReference.type || "text"
+      });
+      // Clear location state to prevent re-opening reply on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -766,7 +782,10 @@ export const Chat = () => {
               </button>
 
               <div className="flex items-center gap-3 min-w-0">
-                <div className="relative flex-shrink-0">
+                <div 
+                  className="relative flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
+                  onClick={() => navigate(`/profile/${recipientId}`)}
+                >
                   <Avatar
                     src={recipientInfo?.photoURL}
                     name={recipientInfo?.name || recipientInfo?.email}
@@ -1064,23 +1083,7 @@ export const Chat = () => {
                     exit={{ opacity: 0, y: 5, scale: 0.9 }}
                     className="flex justify-start mb-4"
                   >
-                    <div className="bg-[#1e1e1e]/90 text-white/90 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm border border-white/10 backdrop-blur-3xl flex items-center gap-1.5 min-w-[60px] justify-center">
-                      <motion.div 
-                        animate={{ y: [0, -5, 0] }} 
-                        transition={{ repeat: Infinity, duration: 0.6, delay: 0 }} 
-                        className="w-1.5 h-1.5 bg-green-500 rounded-full" 
-                      />
-                      <motion.div 
-                        animate={{ y: [0, -5, 0] }} 
-                        transition={{ repeat: Infinity, duration: 0.6, delay: 0.15 }} 
-                        className="w-1.5 h-1.5 bg-green-500 rounded-full" 
-                      />
-                      <motion.div 
-                        animate={{ y: [0, -5, 0] }} 
-                        transition={{ repeat: Infinity, duration: 0.6, delay: 0.3 }} 
-                        className="w-1.5 h-1.5 bg-green-500 rounded-full" 
-                      />
-                    </div>
+                    <TypingIndicator variant="bubble" />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -1172,7 +1175,7 @@ export const Chat = () => {
                     >
                       <div className="flex-1 min-w-0 pr-4">
                         <div className="text-xs font-bold text-green-400 truncate">
-                          Replying to {replyingTo.senderId === user.uid ? "yourself" : (recipientInfo?.name || "Recipient")}
+                          Replying to {replyingTo.senderName || (replyingTo.senderId === user.uid ? "yourself" : (recipientInfo?.name || "Recipient"))}
                         </div>
                         <div className="text-[11px] text-white/50 truncate">
                           {replyingTo.text || (replyingTo.type === "image" ? "🖼️ Image" : replyingTo.type === "voice" ? "🎤 Voice note" : replyingTo.type === "sticker" ? "🎨 Sticker" : "📁 File")}
